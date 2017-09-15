@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+
+  RewriteCond %{REQUEST_URI} !^/docs/1.2/archive/.*
+  RewriteRule ^(.*)$ http://www.freeipa.org/page/Upstream_User_Guide [R=301,L]
+</IfModule>

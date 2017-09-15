@@ -1,0 +1,14 @@
+{
+	"@metadata": {
+		"authors": [
+			"Haqmar"
+		]
+	},
+	"openidoptional": "Теләккә күрә",
+	"openidrequired": "Мотлаҡ",
+	"openidnickname": "Ҡушма исем",
+	"openidfullname": "Тулы исем",
+	"openidemail": "Электрон почта адресы",
+	"openidlanguage": "Тел",
+	"openidtimezone": "Ваҡыт бүлкәте"
+}

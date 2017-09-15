@@ -1,0 +1,4 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+  RewriteRule ^(.*)$ http://www.freeipa.org/page/Upstream_User_Guide [R=301,L]
+</IfModule>

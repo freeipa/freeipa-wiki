@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'Venturis Sans';
+    src: url('/skins/strapping/font/venturissansadf-regular-webfont.eot');
+    src: url('/skins/strapping/font/venturissansadf-regular-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/skins/strapping/font/venturissansadf-regular-webfont.woff') format('woff'),
+         url('/skins/strapping/font/venturissansadf-regular-webfont.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
