@@ -1,6 +1,7 @@
 <IfModule mod_rewrite.c>
    RewriteEngine on
    RewriteRule    ^health.php$ health.php    [L]
+   RewriteRule    ^([^/]+/)*favicon\.ico$ /images/freeipa/favicon.ico [L]
    RewriteRule    ^$ php/    [L]
    RewriteRule    (.*) php/$1 [L]
 </IfModule>
