@@ -2,12 +2,7 @@
    RewriteEngine on
 
    # rewrite freeipa.org to www.freeipa.org
-   RewriteCond %{HTTPS} off
-   RewriteCond %{HTTP_HOST} !^www\.(.*)$ [NC]
-   RewriteRule ^(.*)$ http://www.freeipa.org/$1 [R=301,L]
-
-   RewriteCond %{HTTPS} on
-   RewriteCond %{HTTP_HOST} !^www\.(.*)$ [NC]
+   RewriteCond %{HTTP_HOST} ^freeipa.org$ [NC]
    RewriteRule ^(.*)$ https://www.freeipa.org/$1 [R=301,L]
 
    # health endpoint for OCP
