@@ -308,7 +308,7 @@ if ($user_authentication == "oidc") {
     $wgOpenIDConnect_UseRealNameAsUserName = false;
     $wgOpenIDConnect_UseEmailNameAsUserName = false;
     $wgOpenIDConnect_MigrateUsersByUserName = false;
-    $wgOpenIDConnect_MigrateUsersByEmail = true;
+    $wgOpenIDConnect_MigrateUsersByEmail = false;
     $wgOpenIDConnect_ForceLogout = false;
 }
 elseif ($user_authentication == "openid")
