@@ -299,6 +299,10 @@ class OpenIDConnectClient
             return $this->redirectURL;
         }
 
+        if ( isset( $GLOBALS['wgOpenIDConnect_RedirectURI'] ) ) {
+            return $GLOBALS['wgOpenIDConnect_RedirectURI'];
+        }
+
         // Other-wise return the URL of the current page
 
         /**

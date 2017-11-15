@@ -310,6 +310,7 @@ if ($user_authentication == "oidc") {
     $wgOpenIDConnect_MigrateUsersByUserName = false;
     $wgOpenIDConnect_MigrateUsersByEmail = false;
     $wgOpenIDConnect_ForceLogout = false;
+    $wgOpenIDConnect_RedirectURI = 'https://www.freeipa.org/page/Special/PluggableAuthLogin';
 }
 elseif ($user_authentication == "openid")
 {
