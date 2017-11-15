@@ -17,6 +17,7 @@ return array(
     'JakubOnderka\\PhpConsoleColor' => array($vendorDir . '/jakub-onderka/php-console-color/src'),
     'File' => array($vendorDir . '/phpseclib/phpseclib/phpseclib'),
     'Crypt' => array($vendorDir . '/phpseclib/phpseclib/phpseclib'),
+    'ComposerVendorHtaccessCreator' => array($baseDir . '/includes/composer'),
     'ComposerHookHandler' => array($baseDir . '/includes/composer'),
     '' => array($vendorDir . '/cssjanus/cssjanus/src'),
 );
