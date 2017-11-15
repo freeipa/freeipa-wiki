@@ -281,7 +281,7 @@ $wgPiwikIDSite = "1";
 #   - oidc: OpenID Connect based authentication
 #   - openid: OpenID based authentication (old and deprecated)
 #   - simple: Simple user login
-$user_authentication = "simple";
+$user_authentication = "oidc";
 
 if ($user_authentication == "oidc") {
     # PluggableAuth settings
