@@ -340,3 +340,5 @@ else
 {
     die('Unsupported $user_authentication value: '. $user_authentication);
 }
+
+$wgReadOnly = 'This is a staging wiki with a snapshot from Nov 16th. The database will be updated once current www.freeipa.org DNS is changed.';
