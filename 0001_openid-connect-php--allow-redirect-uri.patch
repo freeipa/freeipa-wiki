@@ -1,0 +1,29 @@
+From cc326520da51bba95026c1fb1051a695d959142a Mon Sep 17 00:00:00 2001
+From: Martin Kosek <mkosek@redhat.com>
+Date: Wed, 15 Nov 2017 21:29:00 +0100
+Subject: [PATCH] Hack OIDC to return custom redirect_uri
+
+FreeIPA running in OCP is actually running under http and thus the redirect_uri
+does not match.
+---
+ php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php b/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
+index 6c88fe02d9690ed4e867101ea2d6f5cf3821529b..a97edd97be62fd5338008cc959f39b4f8bb9bf6d 100644
+--- a/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
++++ b/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
+@@ -299,6 +299,10 @@ class OpenIDConnectClient
+             return $this->redirectURL;
+         }
+ 
++        if ( isset( $GLOBALS['wgOpenIDConnect_RedirectURI'] ) ) {
++            return $GLOBALS['wgOpenIDConnect_RedirectURI'];
++        }
++
+         // Other-wise return the URL of the current page
+ 
+         /**
+-- 
+2.13.6
+
