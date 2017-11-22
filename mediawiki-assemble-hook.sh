@@ -12,7 +12,4 @@ ln -s /opt/app-root/data/downloads/ /opt/app-root/src/php/downloads
 ln -s /opt/app-root/data/docs/1.2/archive /opt/app-root/src/php/docs/1.2/archive
 ln -s /opt/app-root/data/docs/2.0.0/archive /opt/app-root/src/php/docs/2.0.0/archive
 
-# Install missing PEAR packages
-pear install mail net_smtp
-
 echo "Mediawiki assemble hook OK"
