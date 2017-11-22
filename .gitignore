@@ -1,2 +1,6 @@
 # wiki build
 /php/composer.phar
+/composer.phar
+
+# vendor libraries
+/php/vendor
