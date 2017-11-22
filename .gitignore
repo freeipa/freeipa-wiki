@@ -1,6 +1,8 @@
 # wiki build
 /php/composer.phar
 /composer.phar
+/php/composer.lock
 
 # vendor libraries
 /php/vendor
+/vendor
