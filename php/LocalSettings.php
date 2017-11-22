@@ -64,18 +64,6 @@ if (!$on_openshift) {
     $wgShowExceptionDetails = True;
 }
 
-## UPO means: this is also a user preference option
-
-$wgEnableEmail      = true;
-$wgEnableUserEmail  = true; # UPO
-
-$wgEmergencyContact = "mkosek@redhat.com";
-$wgPasswordSender   = "mkosek@redhat.com";
-
-$wgEnotifUserTalk      = false; # UPO
-$wgEnotifWatchlist     = false; # UPO
-$wgEmailAuthentication = true;
-
 ## Database settings
 $wgDBtype           = "mysql";
 if ($on_openshift) {
@@ -264,12 +252,25 @@ if ($on_aws) {
     $wgEnableSidebarCache = true;
 }
 
-#SMTP
+## Email settings
+$wgEnableEmail      = true;
+$wgEnableUserEmail  = true;
+
+$wgEmergencyContact = "mkosek@redhat.com";
+$wgPasswordSender   = "noreply@mg.freeipa.org";
+$wgNoReplyAddress   = "noreply@mg.freeipa.org";
+
+$wgEnotifUserTalk      = true;
+$wgEnotifWatchlist     = true;
+$wgEmailAuthentication = true;
+
 $wgSMTP = array (
    'IDHost' => 'www.freeipa.org',
-   'host'   => 'localhost',
-   'port'   => 25,
-   'auth'   => false,
+   'host'   => 'smtp.mailgun.org',
+   'port'   => 587,
+   'auth'   => true,
+   'username' => getenv("SMTP_USER"),
+   'password' => getenv("SMTP_PASSWORD"),
 );
 
 # Piwik
