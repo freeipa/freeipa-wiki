@@ -65,7 +65,13 @@ class ReplaceTextJob extends Job {
 					wfProfileOut( __METHOD__ );
 					return false;
 				}
-				$article_text = $wikiPage->getContent()->getNativeData();
+				$wikiPageContent = $wikiPage->getContent();
+				if ( is_null( $wikiPageContent ) ) {
+					$this->error = 'replaceText: No contents found for wiki page at "' . $this->title->getPrefixedDBkey() . '."';
+					wfProfileOut( __METHOD__ );
+					return false;
+				}
+				$article_text = $wikiPageContent->getNativeData();
 			} else {
 				$article = new Article( $this->title, 0 );
 				if ( !$article ) {
@@ -79,11 +85,10 @@ class ReplaceTextJob extends Job {
 			wfProfileIn( __METHOD__ . '-replace' );
 			$target_str = $this->params['target_str'];
 			$replacement_str = $this->params['replacement_str'];
-			// @todo FIXME eh?
-			$num_matches;
+			$num_matches = 0;
 
 			if ( $this->params['use_regex'] ) {
-				$new_text = preg_replace( '/'.$target_str.'/U', $replacement_str, $article_text, -1, $num_matches );
+				$new_text = preg_replace( '/' . $target_str . '/U', $replacement_str, $article_text, -1, $num_matches );
 			} else {
 				$new_text = str_replace( $target_str, $replacement_str, $article_text, $num_matches );
 			}

@@ -221,7 +221,7 @@ $wgFileExtensions = array( 'png', 'gif', 'jpg', 'jpeg', 'pdf', 'ogg', 'svg', 'od
 # Extensions
 wfLoadExtension('SyntaxHighlight_GeSHi');
 wfLoadExtension('ParserFunctions');
-require_once "$IP/extensions/ReplaceText/ReplaceText.php";
+wfLoadExtension( 'ReplaceText' );
 require_once "$IP/extensions/EmbedVideo/EmbedVideo.php";
 require_once "$IP/extensions/DynamicPageList/DynamicPageList.php";
 # https://www.mediawiki.org/wiki/Extension:Cite
