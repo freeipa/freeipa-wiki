@@ -224,7 +224,6 @@ wfLoadExtension('ParserFunctions');
 require_once "$IP/extensions/ReplaceText/ReplaceText.php";
 require_once "$IP/extensions/EmbedVideo/EmbedVideo.php";
 require_once "$IP/extensions/DynamicPageList/DynamicPageList.php";
-require_once "$IP/extensions/Piwik/Piwik.php";
 # https://www.mediawiki.org/wiki/Extension:Cite
 wfLoadExtension('Cite');
 wfLoadExtension('Nuke');
@@ -272,10 +271,6 @@ $wgSMTP = array (
    'username' => getenv("SMTP_USER"),
    'password' => getenv("SMTP_PASSWORD"),
 );
-
-# Piwik
-$wgPiwikURL = "piwik-freeipaorg.rhcloud.com/";
-$wgPiwikIDSite = "1";
 
 # User authentication configuration
 # Available choices:
