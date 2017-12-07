@@ -223,7 +223,8 @@ wfLoadExtension('SyntaxHighlight_GeSHi');
 wfLoadExtension('ParserFunctions');
 wfLoadExtension( 'ReplaceText' );
 wfLoadExtension( 'EmbedVideo' );
-require_once "$IP/extensions/DynamicPageList/DynamicPageList.php";
+# https://www.mediawiki.org/wiki/Extension:DynamicPageList_(Wikimedia)
+wfLoadExtension( 'intersection' );
 # https://www.mediawiki.org/wiki/Extension:Cite
 wfLoadExtension('Cite');
 wfLoadExtension('Nuke');
