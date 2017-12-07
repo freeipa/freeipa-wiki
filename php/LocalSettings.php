@@ -48,8 +48,6 @@ if ($on_openshift) {
     $application_domain = getenv('APPLICATION_DOMAIN');
     if ($application_domain)
         $wgServer           = "//" . $application_domain;
-} else {
-    $wgServer           = "//www.freeipa.org";
 }
 
 ## The relative URL path to the skins directory
@@ -74,7 +72,7 @@ if ($on_openshift) {
     $wgDBpassword       = getenv('DATABASE_PASSWORD');
 } else {
     $wgDBname           = "www_freeipa_org";
-    $wgDBserver         = 'localhost';
+    $wgDBserver         = '127.0.0.1';
     $wgDBuser           = 'www_freeipa_org';
     $wgDBpassword       = 'password';
 }
