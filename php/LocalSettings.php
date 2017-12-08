@@ -243,7 +243,7 @@ $wgNamespacesToBeSearchedDefault[502] = true;
 $wgSitemapNamespaces = array(0, 1, 2, 6, 8, 10, 12, 14, 501, 502);
 
 # Performance tuning
-if ($on_aws) {
+if ($on_openshift) {
     $wgMessageCacheType = CACHE_ACCEL;
     $wgUseLocalMessageCache = true;
     $wgParserCacheType = CACHE_ACCEL;
