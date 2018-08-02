@@ -14,7 +14,7 @@ ln -s /opt/app-root/data/docs/2.0.0/archive /opt/app-root/src/php/docs/2.0.0/arc
 
 # Install wiki dependencies
 ./composer.phar require -d /opt/app-root/src/php/ --no-update pear/mail pear/net_smtp
-./composer.phar install -d /opt/app-root/src/php/ --no-ansi --optimize-autoloader
+./composer.phar install -d /opt/app-root/src/php/ --no-dev --no-ansi --optimize-autoloader
 
 # Hack: enable redirect_uri knob with openid-connect-php
 patch -p1 -d /opt/app-root/src/ < 0001_openid-connect-php--allow-redirect-uri.patch
