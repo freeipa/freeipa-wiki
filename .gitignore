@@ -1,3 +1,4 @@
+## Files and directories added during build
 # wiki build
 /php/composer.phar
 /composer.phar
@@ -6,3 +7,9 @@
 # vendor libraries
 /php/vendor
 /vendor
+
+# content symlinks
+/php/images
+/php/downloads
+/php/docs/1.2/archive
+/php/docs/2.0.0/archive
