@@ -54,9 +54,9 @@ class SearchMySQL extends SearchDatabase {
 		if ( preg_match_all( '/([-+<>~]?)(([' . $lc . ']+)(\*?)|"[^"]*")/',
 				$filteredText, $m, PREG_SET_ORDER ) ) {
 			foreach ( $m as $bits ) {
-				MediaWiki\suppressWarnings();
+				Wikimedia\suppressWarnings();
 				list( /* all */, $modifier, $term, $nonQuoted, $wildcard ) = $bits;
-				MediaWiki\restoreWarnings();
+				Wikimedia\restoreWarnings();
 
 				if ( $nonQuoted != '' ) {
 					$term = $nonQuoted;
@@ -209,16 +209,16 @@ class SearchMySQL extends SearchDatabase {
 
 	public function supports( $feature ) {
 		switch ( $feature ) {
-		case 'title-suffix-filter':
-			return true;
-		default:
-			return parent::supports( $feature );
+			case 'title-suffix-filter':
+				return true;
+			default:
+				return parent::supports( $feature );
 		}
 	}
 
 	/**
 	 * Add special conditions
-	 * @param array $query
+	 * @param array &$query
 	 * @since 1.18
 	 */
 	protected function queryFeatures( &$query ) {
@@ -231,7 +231,7 @@ class SearchMySQL extends SearchDatabase {
 
 	/**
 	 * Add namespace conditions
-	 * @param array $query
+	 * @param array &$query
 	 * @since 1.18 (changed)
 	 */
 	function queryNamespaces( &$query ) {
@@ -245,7 +245,7 @@ class SearchMySQL extends SearchDatabase {
 
 	/**
 	 * Add limit options
-	 * @param array $query
+	 * @param array &$query
 	 * @since 1.18
 	 */
 	protected function limitResult( &$query ) {

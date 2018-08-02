@@ -4,7 +4,7 @@
  */
 /* global Uint32Array */
 ( function ( mw, $ ) {
-	var userInfoPromise;
+	var userInfoPromise, stickyRandomSessionId;
 
 	/**
 	 * Get the current user's groups or rights
@@ -48,7 +48,7 @@
 				// Support: IE 11
 				crypto = window.crypto || window.msCrypto;
 
-			if ( crypto && crypto.getRandomValues ) {
+			if ( crypto && crypto.getRandomValues && typeof Uint32Array === 'function' ) {
 				// Fill an array with 2 random values, each of which is 32 bits.
 				// Note that Uint32Array is array-like but does not implement Array.
 				rnds = new Uint32Array( 2 );
@@ -69,6 +69,20 @@
 			// Concatenation of two random integers with entropy n and m
 			// returns a string with entropy n+m if those strings are independent
 			return hexRnds.join( '' );
+		},
+
+		/**
+		 * A sticky generateRandomSessionId for the current JS execution context,
+		 * cached within this class.
+		 *
+		 * @return {string} 64 bit integer in hex format, padded
+		 */
+		stickyRandomId: function () {
+			if ( !stickyRandomSessionId ) {
+				stickyRandomSessionId = mw.user.generateRandomSessionId();
+			}
+
+			return stickyRandomSessionId;
 		},
 
 		/**
@@ -143,83 +157,6 @@
 		 */
 		id: function () {
 			return mw.user.getName() || mw.user.sessionId();
-		},
-
-		/**
-		 * Get the user's bucket (place them in one if not done already)
-		 *
-		 *     mw.user.bucket( 'test', {
-		 *         buckets: { ignored: 50, control: 25, test: 25 },
-		 *         version: 1,
-		 *         expires: 7
-		 *     } );
-		 *
-		 * @deprecated since 1.23
-		 * @param {string} key Name of bucket
-		 * @param {Object} options Bucket configuration options
-		 * @param {Object} options.buckets List of bucket-name/relative-probability pairs (required,
-		 *  must have at least one pair)
-		 * @param {number} [options.version=0] Version of bucket test, changing this forces
-		 *  rebucketing
-		 * @param {number} [options.expires=30] Length of time (in days) until the user gets
-		 *  rebucketed
-		 * @return {string} Bucket name - the randomly chosen key of the `options.buckets` object
-		 */
-		bucket: function ( key, options ) {
-			var cookie, parts, version, bucket,
-				range, k, rand, total;
-
-			options = $.extend( {
-				buckets: {},
-				version: 0,
-				expires: 30
-			}, options || {} );
-
-			cookie = mw.cookie.get( 'mwuser-bucket:' + key );
-
-			// Bucket information is stored as 2 integers, together as version:bucket like: "1:2"
-			if ( typeof cookie === 'string' && cookie.length > 2 && cookie.indexOf( ':' ) !== -1 ) {
-				parts = cookie.split( ':' );
-				if ( parts.length > 1 && Number( parts[ 0 ] ) === options.version ) {
-					version = Number( parts[ 0 ] );
-					bucket = String( parts[ 1 ] );
-				}
-			}
-
-			if ( bucket === undefined ) {
-				if ( !$.isPlainObject( options.buckets ) ) {
-					throw new Error( 'Invalid bucket. Object expected for options.buckets.' );
-				}
-
-				version = Number( options.version );
-
-				// Find range
-				range = 0;
-				for ( k in options.buckets ) {
-					range += options.buckets[ k ];
-				}
-
-				// Select random value within range
-				rand = Math.random() * range;
-
-				// Determine which bucket the value landed in
-				total = 0;
-				for ( k in options.buckets ) {
-					bucket = k;
-					total += options.buckets[ k ];
-					if ( total >= rand ) {
-						break;
-					}
-				}
-
-				mw.cookie.set(
-					'mwuser-bucket:' + key,
-					version + ':' + bucket,
-					{ expires: Number( options.expires ) * 86400 }
-				);
-			}
-
-			return bucket;
 		},
 
 		/**

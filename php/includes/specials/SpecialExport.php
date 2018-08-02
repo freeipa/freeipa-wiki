@@ -23,7 +23,7 @@
  * @ingroup SpecialPage
  */
 
-use Mediawiki\MediaWikiServices;
+use MediaWiki\MediaWikiServices;
 
 /**
  * A special page that allows users to export pages in a XML file
@@ -238,7 +238,7 @@ class SpecialExport extends SpecialPage {
 
 		$formDescriptor += [
 			'textarea' => [
-				'class' => 'HTMLTextAreaField',
+				'class' => HTMLTextAreaField::class,
 				'name' => 'pages',
 				'label-message' => 'export-manual',
 				'nodata' => true,
@@ -288,7 +288,7 @@ class SpecialExport extends SpecialPage {
 		$formDescriptor += [
 			'wpDownload' => [
 				'type' => 'check',
-				'name' =>'wpDownload',
+				'name' => 'wpDownload',
 				'id' => 'wpDownload',
 				'default' => $request->wasPosted() ? $request->getCheck( 'wpDownload' ) : true,
 				'label-message' => 'export-download',
@@ -330,7 +330,6 @@ class SpecialExport extends SpecialPage {
 	 * @param bool $exportall Whether to export everything
 	 */
 	private function doExport( $page, $history, $list_authors, $exportall ) {
-
 		// If we are grabbing everything, enable full history and ignore the rest
 		if ( $exportall ) {
 			$history = WikiExporter::FULL;
@@ -381,9 +380,9 @@ class SpecialExport extends SpecialPage {
 			$buffer = WikiExporter::STREAM;
 
 			// This might take a while... :D
-			MediaWiki\suppressWarnings();
+			Wikimedia\suppressWarnings();
 			set_time_limit( 0 );
-			MediaWiki\restoreWarnings();
+			Wikimedia\restoreWarnings();
 		}
 
 		$exporter = new WikiExporter( $db, $history, $buffer );
@@ -534,9 +533,7 @@ class SpecialExport extends SpecialPage {
 	 * @return array
 	 */
 	private function getPageLinks( $inputPages, $pageSet, $depth ) {
-		// @codingStandardsIgnoreStart Squiz.WhiteSpace.SemicolonSpacing.Incorrect
 		for ( ; $depth > 0; --$depth ) {
-			// @codingStandardsIgnoreEnd
 			$pageSet = $this->getLinks(
 				$inputPages, $pageSet, 'pagelinks',
 				[ 'namespace' => 'pl_namespace', 'title' => 'pl_title' ],

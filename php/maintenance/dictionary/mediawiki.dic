@@ -2027,7 +2027,6 @@ isminor
 ismodsince
 ismulti
 isnew
-ispermalink
 isroot
 isself
 isset
@@ -3181,7 +3180,7 @@ prefixsearchdisabled
 prefs
 prefsection
 prefsnologintext2
-prefsubmit
+prefcontrol
 preload
 preloads
 preloadtitle
@@ -4585,7 +4584,6 @@ wrongpassword
 x
 xanalytics
 xbitmap
-xcache
 xcancel
 xdebug
 xdiff

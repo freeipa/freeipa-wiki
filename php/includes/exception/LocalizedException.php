@@ -45,7 +45,7 @@ class LocalizedException extends Exception implements ILocalizedException {
 
 	/**
 	 * @param string|array|MessageSpecifier $messageSpec See Message::newFromSpecifier
-	 * @param int $code Exception code
+	 * @param int $code
 	 * @param Exception|Throwable $previous The previous exception used for the exception chaining.
 	 */
 	public function __construct( $messageSpec, $code = 0, $previous = null ) {
@@ -56,7 +56,7 @@ class LocalizedException extends Exception implements ILocalizedException {
 		// customizations, and make a basic attempt to turn markup into text.
 		$msg = $this->getMessageObject()->inLanguage( 'en' )->useDatabase( false )->text();
 		$msg = preg_replace( '!</?(var|kbd|samp|code)>!', '"', $msg );
-		$msg = html_entity_decode( strip_tags( $msg ), ENT_QUOTES | ENT_HTML5 );
+		$msg = Sanitizer::stripAllTags( $msg );
 		parent::__construct( $msg, $code, $previous );
 	}
 

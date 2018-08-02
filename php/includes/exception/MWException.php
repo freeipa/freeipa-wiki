@@ -55,23 +55,12 @@ class MWException extends Exception {
 		global $wgLang;
 
 		foreach ( $this->getTrace() as $frame ) {
-			if ( isset( $frame['class'] ) && $frame['class'] === 'LocalisationCache' ) {
+			if ( isset( $frame['class'] ) && $frame['class'] === LocalisationCache::class ) {
 				return false;
 			}
 		}
 
 		return $wgLang instanceof Language;
-	}
-
-	/**
-	 * Run hook to allow extensions to modify the text of the exception
-	 *
-	 * @param string $name Class name of the exception
-	 * @param array $args Arguments to pass to the callback functions
-	 * @return string|null String to output or null if any hook has been called
-	 */
-	public function runHooks( $name, $args = [] ) {
-		return MWExceptionRenderer::runHooks( $this, $name, $args );
 	}
 
 	/**
@@ -113,17 +102,17 @@ class MWException extends Exception {
 		} else {
 			$logId = WebRequest::getRequestId();
 			$type = static::class;
-			return "<div class=\"errorbox\">" .
+			return Html::errorBox(
 			htmlspecialchars(
-			'[' . $logId . '] ' .
-			gmdate( 'Y-m-d H:i:s' ) . ": " .
-			$this->msg( "internalerror-fatal-exception",
-				"Fatal exception of type $1",
-				$type,
-				$logId,
-				MWExceptionHandler::getURL( $this )
+				'[' . $logId . '] ' .
+				gmdate( 'Y-m-d H:i:s' ) . ": " .
+				$this->msg( "internalerror-fatal-exception",
+					"Fatal exception of type $1",
+					$type,
+					$logId,
+					MWExceptionHandler::getURL( $this )
 				)
-			) . "</div>\n" .
+			) ) .
 			"<!-- Set \$wgShowExceptionDetails = true; " .
 			"at the bottom of LocalSettings.php to show detailed " .
 			"debugging information. -->";
@@ -166,12 +155,7 @@ class MWException extends Exception {
 		if ( $this->useOutputPage() ) {
 			$wgOut->prepareErrorPage( $this->getPageTitle() );
 
-			$hookResult = $this->runHooks( static::class );
-			if ( $hookResult ) {
-				$wgOut->addHTML( $hookResult );
-			} else {
-				$wgOut->addHTML( $this->getHTML() );
-			}
+			$wgOut->addHTML( $this->getHTML() );
 
 			$wgOut->output();
 		} else {
@@ -185,12 +169,7 @@ class MWException extends Exception {
 				'<style>body { font-family: sans-serif; margin: 0; padding: 0.5em 2em; }</style>' .
 				"</head><body>\n";
 
-			$hookResult = $this->runHooks( static::class . 'Raw' );
-			if ( $hookResult ) {
-				echo $hookResult;
-			} else {
-				echo $this->getHTML();
-			}
+			echo $this->getHTML();
 
 			echo "</body></html>\n";
 		}
@@ -210,7 +189,7 @@ class MWException extends Exception {
 		} elseif ( self::isCommandLine() ) {
 			$message = $this->getText();
 			// T17602: STDERR may not be available
-			if ( defined( 'STDERR' ) ) {
+			if ( !defined( 'MW_PHPUNIT_TEST' ) && defined( 'STDERR' ) ) {
 				fwrite( STDERR, $message );
 			} else {
 				echo $message;

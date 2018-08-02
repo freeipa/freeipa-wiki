@@ -20,6 +20,8 @@
  * @file
  */
 
+use MediaWiki\Shell\Shell;
+
 /**
  * This is a class for holding configuration settings, particularly for
  * multi-wiki sites.
@@ -345,7 +347,7 @@ class SiteConfiguration {
 	 * @param string $setting ID of the setting name to retrieve
 	 * @param string $wiki Wiki ID of the wiki in question.
 	 * @param string $suffix The suffix of the wiki in question.
-	 * @param array $var Reference The variable to insert the value into.
+	 * @param array &$var Reference The variable to insert the value into.
 	 * @param array $params List of parameters. $.'key' is replaced by $value in all returned data.
 	 * @param array $wikiTags The tags assigned to the wiki.
 	 */
@@ -546,19 +548,21 @@ class SiteConfiguration {
 			} else {
 				$this->cfgCache[$wiki] = [];
 			}
-			$retVal = 1;
-			$cmd = wfShellWikiCmd(
+			$result = Shell::makeScriptCommand(
 				"$IP/maintenance/getConfiguration.php",
 				[
 					'--wiki', $wiki,
 					'--settings', implode( ' ', $settings ),
-					'--format', 'PHP'
+					'--format', 'PHP',
 				]
-			);
-			// ulimit5.sh breaks this call
-			$data = trim( wfShellExec( $cmd, $retVal, [], [ 'memory' => 0 ] ) );
-			if ( $retVal != 0 || !strlen( $data ) ) {
-				throw new MWException( "Failed to run getConfiguration.php." );
+			)
+				// limit.sh breaks this call
+				->limits( [ 'memory' => 0, 'filesize' => 0 ] )
+				->execute();
+
+			$data = trim( $result->getStdout() );
+			if ( $result->getExitCode() != 0 || !strlen( $data ) ) {
+				throw new MWException( "Failed to run getConfiguration.php: {$result->getStdout()}" );
 			}
 			$res = unserialize( $data );
 			if ( !is_array( $res ) ) {

@@ -19,11 +19,7 @@
 			icon: 'highlight',
 			indicator: 'down',
 			popup: {
-				// TODO: There is a bug in non-anchored popups in
-				// OOUI, so we set this popup to "anchored" until
-				// the bug is fixed.
-				// See: https://phabricator.wikimedia.org/T159906
-				anchor: true,
+				anchor: false,
 				padded: true,
 				align: 'backwards',
 				horizontalPosition: 'end',
@@ -37,12 +33,14 @@
 		this.model = model;
 
 		// Event
-		this.model.connect( this, { update: 'onModelUpdate' } );
+		this.model.connect( this, { update: 'updateUiBasedOnModel' } );
 		this.colorPickerWidget.connect( this, { chooseColor: 'onChooseColor' } );
 		// This lives inside a MenuOptionWidget, which intercepts mousedown
 		// to select the item. We want to prevent that when we click the highlight
 		// button
 		this.$element.on( 'mousedown', function ( e ) { e.stopPropagation(); } );
+
+		this.updateUiBasedOnModel();
 
 		this.$element
 			.addClass( 'mw-rcfilters-ui-filterItemHighlightButton' );
@@ -56,7 +54,6 @@
 
 	/**
 	 * @static
-	 * @inheritdoc
 	 */
 	mw.rcfilters.ui.FilterItemHighlightButton.static.cancelButtonMouseDownEvents = true;
 
@@ -65,7 +62,7 @@
 	/**
 	 * Respond to item model update event
 	 */
-	mw.rcfilters.ui.FilterItemHighlightButton.prototype.onModelUpdate = function () {
+	mw.rcfilters.ui.FilterItemHighlightButton.prototype.updateUiBasedOnModel = function () {
 		var currentColor = this.model.getHighlightColor(),
 			widget = this;
 

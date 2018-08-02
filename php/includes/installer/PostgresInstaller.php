@@ -46,7 +46,8 @@ class PostgresInstaller extends DatabaseInstaller {
 		'_InstallUser' => 'postgres',
 	];
 
-	public $minimumVersion = '8.3';
+	public static $minimumVersion = '9.2';
+	protected static $notMiniumumVerisonMessage = 'config-postgres-old';
 	public $maxRoleSearchDepth = 5;
 
 	protected $pgConns = [];
@@ -124,8 +125,9 @@ class PostgresInstaller extends DatabaseInstaller {
 
 		// Check version
 		$version = $conn->getServerVersion();
-		if ( version_compare( $version, $this->minimumVersion ) < 0 ) {
-			return Status::newFatal( 'config-postgres-old', $this->minimumVersion, $version );
+		$status = static::meetsMinimumRequirement( $conn->getServerVersion() );
+		if ( !$status->isOK() ) {
+			return $status;
 		}
 
 		$this->setVar( 'wgDBuser', $this->getVar( '_InstallUser' ) );
@@ -150,7 +152,7 @@ class PostgresInstaller extends DatabaseInstaller {
 	/**
 	 * Open a PG connection with given parameters
 	 * @param string $user User name
-	 * @param string $password Password
+	 * @param string $password
 	 * @param string $dbName Database name
 	 * @param string $schema Database schema
 	 * @return Status
@@ -594,7 +596,7 @@ class PostgresInstaller extends DatabaseInstaller {
 			return $status;
 		}
 
-		/** @var $conn DatabasePostgres */
+		/** @var DatabasePostgres $conn */
 		$conn = $status->value;
 
 		if ( $conn->tableExists( 'archive' ) ) {
@@ -637,7 +639,7 @@ class PostgresInstaller extends DatabaseInstaller {
 
 	public function setupPLpgSQL() {
 		// Connect as the install user, since it owns the database and so is
-		// the user that needs to run "CREATE LANGAUGE"
+		// the user that needs to run "CREATE LANGUAGE"
 		$status = $this->getPgConnection( 'create-schema' );
 		if ( !$status->isOK() ) {
 			return $status;

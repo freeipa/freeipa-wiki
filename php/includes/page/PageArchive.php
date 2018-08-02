@@ -171,48 +171,37 @@ class PageArchive {
 
 	/**
 	 * List the revisions of the given page. Returns result wrapper with
-	 * (ar_minor_edit, ar_timestamp, ar_user, ar_user_text, ar_comment) fields.
+	 * various archive table fields.
 	 *
 	 * @return ResultWrapper
 	 */
 	public function listRevisions() {
-		$dbr = wfGetDB( DB_REPLICA );
+		$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
+		$queryInfo = $revisionStore->getArchiveQueryInfo();
 
-		$tables = [ 'archive' ];
-
-		$fields = [
-			'ar_minor_edit', 'ar_timestamp', 'ar_user', 'ar_user_text',
-			'ar_comment', 'ar_len', 'ar_deleted', 'ar_rev_id', 'ar_sha1',
-			'ar_page_id'
+		$conds = [
+			'ar_namespace' => $this->title->getNamespace(),
+			'ar_title' => $this->title->getDBkey(),
 		];
-
-		if ( $this->config->get( 'ContentHandlerUseDB' ) ) {
-			$fields[] = 'ar_content_format';
-			$fields[] = 'ar_content_model';
-		}
-
-		$conds = [ 'ar_namespace' => $this->title->getNamespace(),
-			'ar_title' => $this->title->getDBkey() ];
-
 		$options = [ 'ORDER BY' => 'ar_timestamp DESC' ];
 
-		$join_conds = [];
-
 		ChangeTags::modifyDisplayQuery(
-			$tables,
-			$fields,
+			$queryInfo['tables'],
+			$queryInfo['fields'],
 			$conds,
-			$join_conds,
+			$queryInfo['joins'],
 			$options,
 			''
 		);
 
-		return $dbr->select( $tables,
-			$fields,
+		$dbr = wfGetDB( DB_REPLICA );
+		return $dbr->select(
+			$queryInfo['tables'],
+			$queryInfo['fields'],
 			$conds,
 			__METHOD__,
 			$options,
-			$join_conds
+			$queryInfo['joins']
 		);
 	}
 
@@ -230,12 +219,14 @@ class PageArchive {
 		}
 
 		$dbr = wfGetDB( DB_REPLICA );
+		$fileQuery = ArchivedFile::getQueryInfo();
 		return $dbr->select(
-			'filearchive',
-			ArchivedFile::selectFields(),
+			$fileQuery['tables'],
+			$fileQuery['fields'],
 			[ 'fa_name' => $this->title->getDBkey() ],
 			__METHOD__,
-			[ 'ORDER BY' => 'fa_timestamp DESC' ]
+			[ 'ORDER BY' => 'fa_timestamp DESC' ],
+			$fileQuery['joins']
 		);
 	}
 
@@ -248,33 +239,20 @@ class PageArchive {
 	 */
 	public function getRevision( $timestamp ) {
 		$dbr = wfGetDB( DB_REPLICA );
+		$arQuery = Revision::getArchiveQueryInfo();
 
-		$fields = [
-			'ar_rev_id',
-			'ar_text',
-			'ar_comment',
-			'ar_user',
-			'ar_user_text',
-			'ar_timestamp',
-			'ar_minor_edit',
-			'ar_flags',
-			'ar_text_id',
-			'ar_deleted',
-			'ar_len',
-			'ar_sha1',
-		];
-
-		if ( $this->config->get( 'ContentHandlerUseDB' ) ) {
-			$fields[] = 'ar_content_format';
-			$fields[] = 'ar_content_model';
-		}
-
-		$row = $dbr->selectRow( 'archive',
-			$fields,
-			[ 'ar_namespace' => $this->title->getNamespace(),
+		$row = $dbr->selectRow(
+			$arQuery['tables'],
+			$arQuery['fields'],
+			[
+				'ar_namespace' => $this->title->getNamespace(),
 				'ar_title' => $this->title->getDBkey(),
-				'ar_timestamp' => $dbr->timestamp( $timestamp ) ],
-			__METHOD__ );
+				'ar_timestamp' => $dbr->timestamp( $timestamp )
+			],
+			__METHOD__,
+			[],
+			$arQuery['joins']
+		);
 
 		if ( $row ) {
 			return Revision::newFromArchiveRow( $row, [ 'title' => $this->title ] );
@@ -337,19 +315,13 @@ class PageArchive {
 	}
 
 	/**
-	 * Get the text from an archive row containing ar_text, ar_flags and ar_text_id
+	 * Get the text from an archive row containing ar_text_id
 	 *
+	 * @deprecated since 1.31
 	 * @param object $row Database row
 	 * @return string
 	 */
 	public function getTextFromRow( $row ) {
-		if ( is_null( $row->ar_text_id ) ) {
-			// An old row from MediaWiki 1.4 or previous.
-			// Text is embedded in this row in classic compression format.
-			return Revision::getRevisionText( $row, 'ar_' );
-		}
-
-		// New-style: keyed to the text storage backend.
 		$dbr = wfGetDB( DB_REPLICA );
 		$text = $dbr->selectRow( 'text',
 			[ 'old_text', 'old_flags' ],
@@ -369,15 +341,18 @@ class PageArchive {
 	 */
 	public function getLastRevisionText() {
 		$dbr = wfGetDB( DB_REPLICA );
-		$row = $dbr->selectRow( 'archive',
-			[ 'ar_text', 'ar_flags', 'ar_text_id' ],
+		$row = $dbr->selectRow(
+			[ 'archive', 'text' ],
+			[ 'old_text', 'old_flags' ],
 			[ 'ar_namespace' => $this->title->getNamespace(),
 				'ar_title' => $this->title->getDBkey() ],
 			__METHOD__,
-			[ 'ORDER BY' => 'ar_timestamp DESC' ] );
+			[ 'ORDER BY' => 'ar_timestamp DESC, ar_id DESC' ],
+			[ 'text' => [ 'JOIN', 'old_id = ar_text_id' ] ]
+		);
 
 		if ( $row ) {
-			return $this->getTextFromRow( $row );
+			return Revision::getRevisionText( $row );
 		}
 
 		return null;
@@ -552,40 +527,23 @@ class PageArchive {
 			$oldWhere['ar_timestamp'] = array_map( [ &$dbw, 'timestamp' ], $timestamps );
 		}
 
-		$fields = [
-			'ar_id',
-			'ar_rev_id',
-			'rev_id',
-			'ar_text',
-			'ar_comment',
-			'ar_user',
-			'ar_user_text',
-			'ar_timestamp',
-			'ar_minor_edit',
-			'ar_flags',
-			'ar_text_id',
-			'ar_deleted',
-			'ar_page_id',
-			'ar_len',
-			'ar_sha1'
-		];
-
-		if ( $this->config->get( 'ContentHandlerUseDB' ) ) {
-			$fields[] = 'ar_content_format';
-			$fields[] = 'ar_content_model';
-		}
+		$revisionStore = MediaWikiServices::getInstance()->getRevisionStore();
+		$queryInfo = $revisionStore->getArchiveQueryInfo();
+		$queryInfo['tables'][] = 'revision';
+		$queryInfo['fields'][] = 'rev_id';
+		$queryInfo['joins']['revision'] = [ 'LEFT JOIN', 'ar_rev_id=rev_id' ];
 
 		/**
 		 * Select each archived revision...
 		 */
 		$result = $dbw->select(
-			[ 'archive', 'revision' ],
-			$fields,
+			$queryInfo['tables'],
+			$queryInfo['fields'],
 			$oldWhere,
 			__METHOD__,
 			/* options */
 			[ 'ORDER BY' => 'ar_timestamp' ],
-			[ 'revision' => [ 'LEFT JOIN', 'ar_rev_id=rev_id' ] ]
+			$queryInfo['joins']
 		);
 
 		$rev_count = $result->numRows();
@@ -716,7 +674,9 @@ class PageArchive {
 						'deleted' => $unsuppress ? 0 : $row->ar_deleted
 					] );
 
+				// This will also copy the revision to ip_changes if it was an IP edit.
 				$revision->insertOn( $dbw );
+
 				$restored++;
 
 				Hooks::run( 'ArticleRevisionUndeleted',
@@ -765,7 +725,9 @@ class PageArchive {
 			Hooks::run( 'ArticleUndelete',
 				[ &$this->title, $created, $comment, $oldPageId, $restoredPages ] );
 			if ( $this->title->getNamespace() == NS_FILE ) {
-				DeferredUpdates::addUpdate( new HTMLCacheUpdate( $this->title, 'imagelinks' ) );
+				DeferredUpdates::addUpdate(
+					new HTMLCacheUpdate( $this->title, 'imagelinks', 'file-restore' )
+				);
 			}
 		}
 

@@ -419,7 +419,7 @@ class Message implements MessageSpecifier, Serializable {
 		}
 
 		if ( $value instanceof Message ) { // Message, RawMessage, ApiMessage, etc
-			$message = clone( $value );
+			$message = clone $value;
 		} elseif ( $value instanceof MessageSpecifier ) {
 			$message = new Message( $value );
 		} elseif ( is_string( $value ) ) {
@@ -488,7 +488,7 @@ class Message implements MessageSpecifier, Serializable {
 	 *
 	 * @since 1.17
 	 *
-	 * @param mixed ... Parameters as strings or arrays from
+	 * @param mixed $args,... Parameters as strings or arrays from
 	 *  Message::numParam() and the like, or a single array of parameters.
 	 *
 	 * @return Message $this
@@ -1105,7 +1105,7 @@ class Message implements MessageSpecifier, Serializable {
 	public static function listParam( array $list, $type = 'text' ) {
 		if ( !isset( self::$listTypeMap[$type] ) ) {
 			throw new InvalidArgumentException(
-				"Invalid type '$type'. Known types are: " . join( ', ', array_keys( self::$listTypeMap ) )
+				"Invalid type '$type'. Known types are: " . implode( ', ', array_keys( self::$listTypeMap ) )
 			);
 		}
 		return [ 'list' => $list, 'type' => $type ];
@@ -1133,7 +1133,7 @@ class Message implements MessageSpecifier, Serializable {
 			list( $paramType, $value ) = $this->extractParam( $param, $format );
 			if ( $type === 'before' ) {
 				if ( $paramType === 'before' ) {
-				$replacementKeys['$' . ( $n + 1 )] = $value;
+					$replacementKeys['$' . ( $n + 1 )] = $value;
 				} else /* $paramType === 'after' */ {
 					// To protect against XSS from replacing parameters
 					// inside html attributes, we convert $1 to $'"1.
@@ -1185,11 +1185,17 @@ class Message implements MessageSpecifier, Serializable {
 			} elseif ( isset( $param['list'] ) ) {
 				return $this->formatListParam( $param['list'], $param['type'], $format );
 			} else {
-				$warning = 'Invalid parameter for message "' . $this->getKey() . '": ' .
-					htmlspecialchars( serialize( $param ) );
-				trigger_error( $warning, E_USER_WARNING );
-				$e = new Exception;
-				wfDebugLog( 'Bug58676', $warning . "\n" . $e->getTraceAsString() );
+				if ( !is_scalar( $param ) ) {
+					$param = serialize( $param );
+				}
+				\MediaWiki\Logger\LoggerFactory::getInstance( 'Bug58676' )->warning(
+					'Invalid parameter for message "{msgkey}": {param}',
+					[
+						'exception' => new Exception,
+						'msgkey' => $this->getKey(),
+						'param' => htmlspecialchars( $param ),
+					]
+				);
 
 				return [ 'before', '[INVALID]' ];
 			}
@@ -1238,7 +1244,16 @@ class Message implements MessageSpecifier, Serializable {
 			$this->getLanguage()
 		);
 
-		return $out instanceof ParserOutput ? $out->getText() : $out;
+		return $out instanceof ParserOutput
+			? $out->getText( [
+				'enableSectionEditLinks' => false,
+				// Wrapping messages in an extra <div> is probably not expected. If
+				// they're outside the content area they probably shouldn't be
+				// targeted by CSS that's targeting the parser output, and if
+				// they're inside they already are from the outer div.
+				'unwrap' => true,
+			] )
+			: $out;
 	}
 
 	/**
@@ -1300,16 +1315,15 @@ class Message implements MessageSpecifier, Serializable {
 	 */
 	protected function formatPlaintext( $plaintext, $format ) {
 		switch ( $format ) {
-		case self::FORMAT_TEXT:
-		case self::FORMAT_PLAIN:
-			return $plaintext;
+			case self::FORMAT_TEXT:
+			case self::FORMAT_PLAIN:
+				return $plaintext;
 
-		case self::FORMAT_PARSE:
-		case self::FORMAT_BLOCK_PARSE:
-		case self::FORMAT_ESCAPED:
-		default:
-			return htmlspecialchars( $plaintext, ENT_QUOTES );
-
+			case self::FORMAT_PARSE:
+			case self::FORMAT_BLOCK_PARSE:
+			case self::FORMAT_ESCAPED:
+			default:
+				return htmlspecialchars( $plaintext, ENT_QUOTES );
 		}
 	}
 
@@ -1361,57 +1375,4 @@ class Message implements MessageSpecifier, Serializable {
 		$vars = $this->getLanguage()->$func( $vars );
 		return $this->extractParam( new RawMessage( $vars, $params ), $format );
 	}
-}
-
-/**
- * Variant of the Message class.
- *
- * Rather than treating the message key as a lookup
- * value (which is passed to the MessageCache and
- * translated as necessary), a RawMessage key is
- * treated as the actual message.
- *
- * All other functionality (parsing, escaping, etc.)
- * is preserved.
- *
- * @since 1.21
- */
-class RawMessage extends Message {
-
-	/**
-	 * Call the parent constructor, then store the key as
-	 * the message.
-	 *
-	 * @see Message::__construct
-	 *
-	 * @param string $text Message to use.
-	 * @param array $params Parameters for the message.
-	 *
-	 * @throws InvalidArgumentException
-	 */
-	public function __construct( $text, $params = [] ) {
-		if ( !is_string( $text ) ) {
-			throw new InvalidArgumentException( '$text must be a string' );
-		}
-
-		parent::__construct( $text, $params );
-
-		// The key is the message.
-		$this->message = $text;
-	}
-
-	/**
-	 * Fetch the message (in this case, the key).
-	 *
-	 * @return string
-	 */
-	public function fetchMessage() {
-		// Just in case the message is unset somewhere.
-		if ( $this->message === null ) {
-			$this->message = $this->key;
-		}
-
-		return $this->message;
-	}
-
 }

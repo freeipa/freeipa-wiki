@@ -8,14 +8,31 @@ class EditPage extends Page {
 	get heading() { return browser.element( '#firstHeading' ); }
 	get save() { return browser.element( '#wpSave' ); }
 
-	open( name ) {
+	openForEditing( name ) {
 		super.open( name + '&action=edit' );
 	}
 
 	edit( name, content ) {
-		this.open( name );
+		this.openForEditing( name );
 		this.content.setValue( content );
 		this.save.click();
+	}
+
+	apiEdit( name, content ) {
+
+		const MWBot = require( 'mwbot' ), // https://github.com/Fannon/mwbot
+			Promise = require( 'bluebird' );
+		let bot = new MWBot();
+
+		return Promise.coroutine( function* () {
+			yield bot.loginGetEditToken( {
+				apiUrl: `${browser.options.baseUrl}/api.php`,
+				username: browser.options.username,
+				password: browser.options.password
+			} );
+			yield bot.edit( name, content, `Created page with "${content}"` );
+		} ).call( this );
+
 	}
 
 }

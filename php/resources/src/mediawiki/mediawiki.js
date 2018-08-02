@@ -53,7 +53,7 @@
 	}
 
 	function defineFallbacks() {
-		// <https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Set>
+		// <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set>
 		StringSet = window.Set || ( function () {
 			/**
 			 * @private
@@ -118,11 +118,11 @@
 	function setGlobalMapValue( map, key, value ) {
 		map.values[ key ] = value;
 		log.deprecate(
-				window,
-				key,
-				value,
-				// Deprecation notice for mw.config globals (T58550, T72470)
-				map === mw.config && 'Use mw.config instead.'
+			window,
+			key,
+			value,
+			// Deprecation notice for mw.config globals (T58550, T72470)
+			map === mw.config && 'Use mw.config instead.'
 		);
 	}
 
@@ -625,7 +625,7 @@
 		 * @param {Function} callback
 		 */
 		trackUnsubscribe: function ( callback ) {
-			trackHandlers = $.grep( trackHandlers, function ( fns ) {
+			trackHandlers = trackHandlers.filter( function ( fns ) {
 				if ( fns[ 1 ] === callback ) {
 					trackCallbacks.remove( fns[ 0 ] );
 					// Ensure the tuple is removed to avoid holding on to closures
@@ -754,6 +754,7 @@
 			 *     is used)
 			 *   - load-callback: exception thrown by user callback
 			 *   - module-execute: exception thrown by module code
+			 *   - resolve: failed to sort dependencies for a module in mw.loader.load
 			 *   - store-eval: could not evaluate module code cached in localStorage
 			 *   - store-localstorage-init: localStorage or JSON parse error in mw.loader.store.init
 			 *   - store-localstorage-json: JSON conversion error in mw.loader.store.set
@@ -878,8 +879,10 @@
 					// Cache
 					marker = document.querySelector( 'meta[name="ResourceLoaderDynamicStyles"]' );
 					if ( !marker ) {
-						mw.log( 'Create <meta name="ResourceLoaderDynamicStyles"> dynamically' );
-						marker = $( '<meta>' ).attr( 'name', 'ResourceLoaderDynamicStyles' ).appendTo( 'head' )[ 0 ];
+						mw.log( 'Created ResourceLoaderDynamicStyles marker dynamically' );
+						marker = document.createElement( 'meta' );
+						marker.name = 'ResourceLoaderDynamicStyles';
+						document.head.appendChild( marker );
 					}
 				}
 				return marker;
@@ -901,7 +904,7 @@
 				if ( nextNode && nextNode.parentNode ) {
 					nextNode.parentNode.insertBefore( s, nextNode );
 				} else {
-					document.getElementsByTagName( 'head' )[ 0 ].appendChild( s );
+					document.head.appendChild( s );
 				}
 
 				return s;
@@ -1126,7 +1129,7 @@
 						registry[ module ].dependencies = [ registry[ module ].dependencies ];
 					}
 				}
-				if ( $.inArray( module, resolved ) !== -1 ) {
+				if ( resolved.indexOf( module ) !== -1 ) {
 					// Module already resolved; nothing to do
 					return;
 				}
@@ -1137,7 +1140,7 @@
 				// Tracks down dependencies
 				deps = registry[ module ].dependencies;
 				for ( i = 0; i < deps.length; i++ ) {
-					if ( $.inArray( deps[ i ], resolved ) === -1 ) {
+					if ( resolved.indexOf( deps[ i ] ) === -1 ) {
 						if ( unresolved.has( deps[ i ] ) ) {
 							throw new Error( mw.format(
 								'Circular reference detected: $1 -> $2',
@@ -1165,6 +1168,33 @@
 				var i, resolved = [];
 				for ( i = 0; i < modules.length; i++ ) {
 					sortDependencies( modules[ i ], resolved );
+				}
+				return resolved;
+			}
+
+			/**
+			 * Like #resolve(), except it will silently ignore modules that
+			 * are missing or have missing dependencies.
+			 *
+			 * @private
+			 * @param {string[]} modules Array of string module names
+			 * @return {Array} List of dependencies.
+			 */
+			function resolveStubbornly( modules ) {
+				var i, saved, resolved = [];
+				for ( i = 0; i < modules.length; i++ ) {
+					saved = resolved.slice();
+					try {
+						sortDependencies( modules[ i ], resolved );
+					} catch ( err ) {
+						// This module is unknown or has unknown dependencies.
+						// Undo any incomplete resolutions made and keep going.
+						resolved = saved;
+						mw.track( 'resourceloader.exception', {
+							exception: err,
+							source: 'resolve'
+						} );
+					}
 				}
 				return resolved;
 			}
@@ -1270,7 +1300,7 @@
 				registry[ module ].state = 'executing';
 
 				runScript = function () {
-					var script, markModuleReady, nestedAddScript, implicitDependencies, implicitWait;
+					var script, markModuleReady, nestedAddScript;
 
 					script = registry[ module ].script;
 					markModuleReady = function () {
@@ -1291,47 +1321,33 @@
 						} );
 					};
 
-					implicitDependencies = [];
+					try {
+						if ( Array.isArray( script ) ) {
+							nestedAddScript( script, markModuleReady, 0 );
+						} else if ( typeof script === 'function' ) {
+							// Pass jQuery twice so that the signature of the closure which wraps
+							// the script can bind both '$' and 'jQuery'.
+							script( $, $, mw.loader.require, registry[ module ].module );
+							markModuleReady();
 
-					if ( module === 'user' ) {
-						// Implicit dependency on the site module. Not real dependency because
-						// it should run after 'site' regardless of whether it succeeds or fails.
-						implicitDependencies.push( 'site' );
-					}
+						} else if ( typeof script === 'string' ) {
+							// Site and user modules are legacy scripts that run in the global scope.
+							// This is transported as a string instead of a function to avoid needing
+							// to use string manipulation to undo the function wrapper.
+							$.globalEval( script );
+							markModuleReady();
 
-					implicitWait = implicitDependencies.length ?
-						mw.loader.using( implicitDependencies ) :
-						$.Deferred().resolve();
-
-					implicitWait.always( function () {
-						try {
-							if ( Array.isArray( script ) ) {
-								nestedAddScript( script, markModuleReady, 0 );
-							} else if ( typeof script === 'function' ) {
-								// Pass jQuery twice so that the signature of the closure which wraps
-								// the script can bind both '$' and 'jQuery'.
-								script( $, $, mw.loader.require, registry[ module ].module );
-								markModuleReady();
-
-							} else if ( typeof script === 'string' ) {
-								// Site and user modules are legacy scripts that run in the global scope.
-								// This is transported as a string instead of a function to avoid needing
-								// to use string manipulation to undo the function wrapper.
-								$.globalEval( script );
-								markModuleReady();
-
-							} else {
-								// Module without script
-								markModuleReady();
-							}
-						} catch ( e ) {
-							// Use mw.track instead of mw.log because these errors are common in production mode
-							// (e.g. undefined variable), and mw.log is only enabled in debug mode.
-							registry[ module ].state = 'error';
-							mw.track( 'resourceloader.exception', { exception: e, module: module, source: 'module-execute' } );
-							handlePending( module );
+						} else {
+							// Module without script
+							markModuleReady();
 						}
-					} );
+					} catch ( e ) {
+						// Use mw.track instead of mw.log because these errors are common in production mode
+						// (e.g. undefined variable), and mw.log is only enabled in debug mode.
+						registry[ module ].state = 'error';
+						mw.track( 'resourceloader.exception', { exception: e, module: module, source: 'module-execute' } );
+						handlePending( module );
+					}
 				};
 
 				// Add localizations to message system
@@ -1351,7 +1367,13 @@
 						// cssHandlesRegistered ensures we don't take off too soon, e.g. when
 						// one of the cssHandles is fired while we're still creating more handles.
 						if ( cssHandlesRegistered && pending === 0 && runScript ) {
-							runScript();
+							if ( module === 'user' ) {
+								// Implicit dependency on the site module. Not real dependency because
+								// it should run after 'site' regardless of whether it succeeds or fails.
+								mw.loader.using( [ 'site' ] ).always( runScript );
+							} else {
+								runScript();
+							}
 							runScript = undefined; // Revoke
 						}
 					};
@@ -1445,7 +1467,7 @@
 				if ( ready !== undefined || error !== undefined ) {
 					jobs.push( {
 						// Narrow down the list to modules that are worth waiting for
-						dependencies: $.grep( dependencies, function ( module ) {
+						dependencies: dependencies.filter( function ( module ) {
 							var state = mw.loader.getState( module );
 							return state === 'registered' || state === 'loaded' || state === 'loading' || state === 'executing';
 						} ),
@@ -1454,11 +1476,11 @@
 					} );
 				}
 
-				$.each( dependencies, function ( idx, module ) {
+				dependencies.forEach( function ( module ) {
 					var state = mw.loader.getState( module );
 					// Only queue modules that are still in the initial 'registered' state
 					// (not ones already loading, ready or error).
-					if ( state === 'registered' && $.inArray( module, queue ) === -1 ) {
+					if ( state === 'registered' && queue.indexOf( module ) === -1 ) {
 						// Private modules must be embedded in the page. Don't bother queuing
 						// these as the server will deny them anyway (T101806).
 						if ( registry[ module ].group === 'private' ) {
@@ -1479,9 +1501,7 @@
 					a = [];
 
 				for ( key in o ) {
-					if ( hasOwn.call( o, key ) ) {
-						a.push( key );
-					}
+					a.push( key );
 				}
 				a.sort();
 				for ( key = 0; key < a.length; key++ ) {
@@ -1491,39 +1511,40 @@
 			}
 
 			/**
-			 * Converts a module map of the form { foo: [ 'bar', 'baz' ], bar: [ 'baz, 'quux' ] }
-			 * to a query string of the form foo.bar,baz|bar.baz,quux
+			 * Converts a module map of the form `{ foo: [ 'bar', 'baz' ], bar: [ 'baz, 'quux' ] }`
+			 * to a query string of the form `foo.bar,baz|bar.baz,quux`.
+			 *
+			 * See `ResourceLoader::makePackedModulesString()` in PHP, of which this is a port.
+			 * On the server, unpacking is done by `ResourceLoaderContext::expandModuleNames()`.
+			 *
+			 * Note: This is only half of the logic, the other half has to be in #batchRequest(),
+			 * because its implementation needs to keep track of potential string size in order
+			 * to decide when to split the requests due to url size.
 			 *
 			 * @private
 			 * @param {Object} moduleMap Module map
-			 * @return {string} Module query string
+			 * @return {Object}
+			 * @return {string} return.str Module query string
+			 * @return {Array} return.list List of module names in matching order
 			 */
 			function buildModulesString( moduleMap ) {
 				var p, prefix,
-					arr = [];
+					str = [],
+					list = [];
+
+				function restore( suffix ) {
+					return p + suffix;
+				}
 
 				for ( prefix in moduleMap ) {
 					p = prefix === '' ? '' : prefix + '.';
-					arr.push( p + moduleMap[ prefix ].join( ',' ) );
+					str.push( p + moduleMap[ prefix ].join( ',' ) );
+					list.push.apply( list, moduleMap[ prefix ].map( restore ) );
 				}
-				return arr.join( '|' );
-			}
-
-			/**
-			 * Make a network request to load modules from the server.
-			 *
-			 * @private
-			 * @param {Object} moduleMap Module map, see #buildModulesString
-			 * @param {Object} currReqBase Object with other parameters (other than 'modules') to use in the request
-			 * @param {string} sourceLoadScript URL of load.php
-			 */
-			function doRequest( moduleMap, currReqBase, sourceLoadScript ) {
-				var query = $.extend(
-					{ modules: buildModulesString( moduleMap ) },
-					currReqBase
-				);
-				query = sortQuery( query );
-				addScript( sourceLoadScript + '?' + $.param( query ) );
+				return {
+					str: str.join( '|' ),
+					list: list
+				};
 			}
 
 			/**
@@ -1566,8 +1587,28 @@
 			function batchRequest( batch ) {
 				var reqBase, splits, maxQueryLength, b, bSource, bGroup, bSourceGroup,
 					source, group, i, modules, sourceLoadScript,
-					currReqBase, currReqBaseLength, moduleMap, l,
+					currReqBase, currReqBaseLength, moduleMap, currReqModules, l,
 					lastDotIndex, prefix, suffix, bytesAdded;
+
+				/**
+				 * Start the currently drafted request to the server.
+				 *
+				 * @ignore
+				 */
+				function doRequest() {
+					// Optimisation: Inherit (Object.create), not copy ($.extend)
+					var query = Object.create( currReqBase ),
+						packed = buildModulesString( moduleMap );
+					query.modules = packed.str;
+					// The packing logic can change the effective order, even if the input was
+					// sorted. As such, the call to getCombinedVersion() must use this
+					// effective order, instead of currReqModules, as otherwise the combined
+					// version will not match the hash expected by the server based on
+					// combining versions from the module query string in-order. (T188076)
+					query.version = getCombinedVersion( packed.list );
+					query = sortQuery( query );
+					addScript( sourceLoadScript + '?' + $.param( query ) );
+				}
 
 				if ( !batch.length ) {
 					return;
@@ -1577,7 +1618,7 @@
 				// misses for otherwise identical content.
 				batch.sort();
 
-				// Build a list of query parameters common to all requests
+				// Query parameters common to all requests
 				reqBase = {
 					skin: mw.config.get( 'skin' ),
 					lang: mw.config.get( 'wgUserLanguage' ),
@@ -1610,50 +1651,57 @@
 						// modules for this group from this source.
 						modules = splits[ source ][ group ];
 
-						currReqBase = $.extend( {
-							version: getCombinedVersion( modules )
-						}, reqBase );
-						// For user modules append a user name to the query string.
+						// Query parameters common to requests for this module group
+						// Optimisation: Inherit (Object.create), not copy ($.extend)
+						currReqBase = Object.create( reqBase );
+						// User modules require a user name in the query string.
 						if ( group === 'user' && mw.config.get( 'wgUserName' ) !== null ) {
 							currReqBase.user = mw.config.get( 'wgUserName' );
 						}
-						currReqBaseLength = $.param( currReqBase ).length;
+
+						// In addition to currReqBase, doRequest() will also add 'modules' and 'version'.
+						// > '&modules='.length === 9
+						// > '&version=1234567'.length === 16
+						// > 9 + 16 = 25
+						currReqBaseLength = $.param( currReqBase ).length + 25;
+
 						// We may need to split up the request to honor the query string length limit,
 						// so build it piece by piece.
-						l = currReqBaseLength + 9; // '&modules='.length == 9
-
+						l = currReqBaseLength;
 						moduleMap = {}; // { prefix: [ suffixes ] }
+						currReqModules = [];
 
 						for ( i = 0; i < modules.length; i++ ) {
 							// Determine how many bytes this module would add to the query string
 							lastDotIndex = modules[ i ].lastIndexOf( '.' );
-
 							// If lastDotIndex is -1, substr() returns an empty string
 							prefix = modules[ i ].substr( 0, lastDotIndex );
 							suffix = modules[ i ].slice( lastDotIndex + 1 );
-
 							bytesAdded = hasOwn.call( moduleMap, prefix ) ?
 								suffix.length + 3 : // '%2C'.length == 3
 								modules[ i ].length + 3; // '%7C'.length == 3
 
-							// If the url would become too long, create a new one,
-							// but don't create empty requests
-							if ( maxQueryLength > 0 && !$.isEmptyObject( moduleMap ) && l + bytesAdded > maxQueryLength ) {
-								// This url would become too long, create a new one, and start the old one
-								doRequest( moduleMap, currReqBase, sourceLoadScript );
+							// If the url would become too long, create a new one, but don't create empty requests
+							if ( maxQueryLength > 0 && currReqModules.length && l + bytesAdded > maxQueryLength ) {
+								// Dispatch what we've got...
+								doRequest();
+								// .. and start again.
+								l = currReqBaseLength;
 								moduleMap = {};
-								l = currReqBaseLength + 9;
+								currReqModules = [];
+
 								mw.track( 'resourceloader.splitRequest', { maxQueryLength: maxQueryLength } );
 							}
 							if ( !hasOwn.call( moduleMap, prefix ) ) {
 								moduleMap[ prefix ] = [];
 							}
-							moduleMap[ prefix ].push( suffix );
 							l += bytesAdded;
+							moduleMap[ prefix ].push( suffix );
+							currReqModules.push( modules[ i ] );
 						}
 						// If there's anything left in moduleMap, request that too
-						if ( !$.isEmptyObject( moduleMap ) ) {
-							doRequest( moduleMap, currReqBase, sourceLoadScript );
+						if ( currReqModules.length ) {
+							doRequest();
 						}
 					}
 				}
@@ -1700,7 +1748,10 @@
 			function splitModuleKey( key ) {
 				var index = key.indexOf( '@' );
 				if ( index === -1 ) {
-					return { name: key };
+					return {
+						name: key,
+						version: ''
+					};
 				}
 				return {
 					name: key.slice( 0, index ),
@@ -1741,7 +1792,7 @@
 						// Only load modules which are registered
 						if ( hasOwn.call( registry, queue[ q ] ) && registry[ queue[ q ] ].state === 'registered' ) {
 							// Prevent duplicate entries
-							if ( $.inArray( queue[ q ], batch ) === -1 ) {
+							if ( batch.indexOf( queue[ q ] ) === -1 ) {
 								batch.push( queue[ q ] );
 								// Mark registered modules as loading
 								registry[ queue[ q ] ].state = 'loading';
@@ -1764,7 +1815,7 @@
 					if ( mw.loader.store.enabled ) {
 						implementations = [];
 						sourceModules = [];
-						batch = $.grep( batch, function ( module ) {
+						batch = batch.filter( function ( module ) {
 							var implementation = mw.loader.store.get( module );
 							if ( implementation ) {
 								implementations.push( implementation );
@@ -1789,7 +1840,7 @@
 
 							mw.track( 'resourceloader.exception', { exception: err, source: 'store-eval' } );
 							// Re-add the failed ones that are still pending back to the batch
-							failed = $.grep( sourceModules, function ( module ) {
+							failed = sourceModules.filter( function ( module ) {
 								return registry[ module ].state === 'loading';
 							} );
 							batchRequest( failed );
@@ -1942,7 +1993,7 @@
 					registry[ name ].messages = messages || null;
 					registry[ name ].templates = templates || null;
 					// The module may already have been marked as erroneous
-					if ( $.inArray( registry[ name ].state, [ 'error', 'missing' ] ) === -1 ) {
+					if ( registry[ name ].state !== 'error' && registry[ name ].state !== 'missing' ) {
 						registry[ name ].state = 'loaded';
 						if ( allReady( registry[ name ].dependencies ) ) {
 							execute( name );
@@ -1957,6 +2008,12 @@
 				 *
 				 *     mw.loader.using( 'oojs', function () {
 				 *         OO.compare( [ 1 ], [ 1 ] );
+				 *     } );
+				 *
+				 * Example of inline dependency obtained via `require()`:
+				 *
+				 *     mw.loader.using( [ 'mediawiki.util' ], function ( require ) {
+				 *         var util = require( 'mediawiki.util' );
 				 *     } );
 				 *
 				 * Since MediaWiki 1.23 this also returns a promise.
@@ -2012,6 +2069,15 @@
 				/**
 				 * Load an external script or one or more modules.
 				 *
+				 * This method takes a list of unrelated modules. Use cases:
+				 *
+				 * - A web page will be composed of many different widgets. These widgets independently
+				 *   queue their ResourceLoader modules (`OutputPage::addModules()`). If any of them
+				 *   have problems, or are no longer known (e.g. cached HTML), the other modules
+				 *   should still be loaded.
+				 * - This method is used for preloading, which must not throw. Later code that
+				 *   calls #using() will handle the error.
+				 *
 				 * @param {string|Array} modules Either the name of a module, array of modules,
 				 *  or a URL of an external script or style
 				 * @param {string} [type='text/javascript'] MIME type to use if calling with a URL of an
@@ -2029,7 +2095,7 @@
 								l = document.createElement( 'link' );
 								l.rel = 'stylesheet';
 								l.href = modules;
-								$( 'head' ).append( l );
+								document.head.appendChild( l );
 								return;
 							}
 							if ( type === 'text/javascript' || type === undefined ) {
@@ -2043,23 +2109,19 @@
 						modules = [ modules ];
 					}
 
-					// Filter out undefined modules, otherwise resolve() will throw
-					// an exception for trying to load an undefined module.
-					// Undefined modules are acceptable here in load(), because load() takes
-					// an array of unrelated modules, whereas the modules passed to
-					// using() are related and must all be loaded.
-					filtered = $.grep( modules, function ( module ) {
+					// Filter out top-level modules that are unknown or failed to load before.
+					filtered = modules.filter( function ( module ) {
 						var state = mw.loader.getState( module );
-						return state !== null && state !== 'error' && state !== 'missing';
+						return state !== 'error' && state !== 'missing';
 					} );
-
-					if ( filtered.length === 0 ) {
-						return;
-					}
-					// Resolve entire dependency map
-					filtered = resolve( filtered );
+					// Resolve remaining list using the known dependency tree.
+					// This also filters out modules with unknown dependencies. (T36853)
+					filtered = resolveStubbornly( filtered );
 					// If all modules are ready, or if any modules have errors, nothing to be done.
 					if ( allReady( filtered ) || anyFailed( filtered ) ) {
+						return;
+					}
+					if ( filtered.length === 0 ) {
 						return;
 					}
 					// Some modules are not yet ready, add to module load queue.
@@ -2085,7 +2147,7 @@
 						mw.loader.register( module );
 					}
 					registry[ module ].state = state;
-					if ( $.inArray( state, [ 'ready', 'error', 'missing' ] ) !== -1 ) {
+					if ( state === 'ready' || state === 'error' || state === 'missing' ) {
 						// Make sure pending modules depending on this one get executed if their
 						// dependencies are now fulfilled!
 						handlePending( module );
@@ -2100,10 +2162,7 @@
 				 *  in the registry.
 				 */
 				getVersion: function ( module ) {
-					if ( !hasOwn.call( registry, module ) || registry[ module ].version === undefined ) {
-						return null;
-					}
-					return registry[ module ].version;
+					return hasOwn.call( registry, module ) ? registry[ module ].version : null;
 				},
 
 				/**
@@ -2114,10 +2173,7 @@
 				 *  in the registry.
 				 */
 				getState: function ( module ) {
-					if ( !hasOwn.call( registry, module ) || registry[ module ].state === undefined ) {
-						return null;
-					}
-					return registry[ module ].state;
+					return hasOwn.call( registry, module ) ? registry[ module ].state : null;
 				},
 
 				/**
@@ -2132,9 +2188,14 @@
 				/**
 				 * Get the exported value of a module.
 				 *
-				 * Modules may provide this via their local `module.exports`.
+				 * This static method is publicly exposed for debugging purposes
+				 * only and must not be used in production code. In production code,
+				 * please use the dynamically provided `require()` function instead.
 				 *
-				 * @protected
+				 * In case of lazy-loaded modules via mw.loader#using(), the returned
+				 * Promise provides the function, see #using() for examples.
+				 *
+				 * @private
 				 * @since 1.27
 				 * @param {string} moduleName Module name
 				 * @return {Mixed} Exported value
@@ -2323,11 +2384,13 @@
 							// Module failed to load
 							descriptor.state !== 'ready' ||
 							// Unversioned, private, or site-/user-specific
-							( !descriptor.version || $.inArray( descriptor.group, [ 'private', 'user' ] ) !== -1 ) ||
+							!descriptor.version ||
+							descriptor.group === 'private' ||
+							descriptor.group === 'user' ||
 							// Partial descriptor
 							// (e.g. skipped module, or style module with state=ready)
-							$.inArray( undefined, [ descriptor.script, descriptor.style,
-								descriptor.messages, descriptor.templates ] ) !== -1
+							[ descriptor.script, descriptor.style, descriptor.messages,
+								descriptor.templates ].indexOf( undefined ) !== -1
 						) {
 							// Decline to store
 							return false;
@@ -2728,11 +2791,10 @@
 			msg += ( e ? ':' : '.' );
 			console.log( msg );
 
-			// If we have an exception object, log it to the error channel to trigger
-			// proper stacktraces in browsers that support it. No fallback as we have
-			// no browsers that don't support error(), but do support log().
-			if ( e && console.error ) {
-				console.error( String( e ), e );
+			// If we have an exception object, log it to the warning channel to trigger
+			// proper stacktraces in browsers that support it.
+			if ( e && console.warn ) {
+				console.warn( e );
 			}
 		}
 		/* eslint-enable no-console */
@@ -2751,15 +2813,15 @@
 	$( function () {
 		var loading, modules;
 
-		modules = $.grep( mw.loader.getModuleNames(), function ( module ) {
+		modules = mw.loader.getModuleNames().filter( function ( module ) {
 			return mw.loader.getState( module ) === 'loading';
 		} );
 		// We only need a callback, not any actual module. First try a single using()
 		// for all loading modules. If one fails, fall back to tracking each module
 		// separately via $.when(), this is expensive.
-		loading = mw.loader.using( modules ).then( null, function () {
+		loading = mw.loader.using( modules ).catch( function () {
 			var all = modules.map( function ( module ) {
-				return mw.loader.using( module ).then( null, function () {
+				return mw.loader.using( module ).catch( function () {
 					return $.Deferred().resolve();
 				} );
 			} );

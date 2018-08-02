@@ -17,8 +17,8 @@
  *
  * @file
  * @ingroup Cache
- * @author Aaron Schulz
  */
+use Wikimedia\ObjectFactory;
 
 /**
  * A cache class that directs writes to one set of servers and reads to

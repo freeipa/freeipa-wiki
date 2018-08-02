@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on Sep 24, 2006
- *
  * Copyright © 2006, 2013 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -121,7 +117,7 @@ class ApiPageSet extends ApiBase {
 	public function __construct( ApiBase $dbSource, $flags = 0, $defaultNamespace = NS_MAIN ) {
 		parent::__construct( $dbSource->getMain(), $dbSource->getModuleName() );
 		$this->mDbSource = $dbSource;
-		$this->mAllowGenerator = ( $flags & ApiPageSet::DISABLE_GENERATORS ) == 0;
+		$this->mAllowGenerator = ( $flags & self::DISABLE_GENERATORS ) == 0;
 		$this->mDefaultNamespace = $defaultNamespace;
 
 		$this->mParams = $this->extractRequestParams();
@@ -166,7 +162,7 @@ class ApiPageSet extends ApiBase {
 			}
 			// Create a temporary pageset to store generator's output,
 			// add any additional fields generator may need, and execute pageset to populate titles/pageids
-			$tmpPageSet = new ApiPageSet( $dbSource, ApiPageSet::DISABLE_GENERATORS );
+			$tmpPageSet = new ApiPageSet( $dbSource, self::DISABLE_GENERATORS );
 			$generator->setGeneratorMode( $tmpPageSet );
 			$this->mCacheMode = $generator->getCacheMode( $generator->extractRequestParams() );
 
@@ -753,7 +749,7 @@ class ApiPageSet extends ApiBase {
 	 * $this->getPageTableFields().
 	 *
 	 * @param IDatabase $db
-	 * @param ResultWrapper $queryResult Query result object
+	 * @param ResultWrapper $queryResult
 	 */
 	public function populateFromQueryResult( $db, $queryResult ) {
 		$this->initFromQueryResult( $queryResult );
@@ -1356,7 +1352,7 @@ class ApiPageSet extends ApiBase {
 			}
 		}
 		foreach ( $this->mGeneratorData as $ns => $dbkeys ) {
-			if ( $ns === -1 ) {
+			if ( $ns === NS_SPECIAL ) {
 				$pages = [];
 				foreach ( $this->mSpecialTitles as $id => $title ) {
 					$pages[$title->getDBkey()] = $id;
@@ -1532,7 +1528,7 @@ class ApiPageSet extends ApiBase {
 			$prefix = $query->getModulePath() . '+';
 			$mgr = $query->getModuleManager();
 			foreach ( $mgr->getNamesWithClasses() as $name => $class ) {
-				if ( is_subclass_of( $class, 'ApiQueryGeneratorBase' ) ) {
+				if ( is_subclass_of( $class, ApiQueryGeneratorBase::class ) ) {
 					$gens[$name] = $prefix . $name;
 				}
 			}

@@ -45,7 +45,7 @@ class MemcachedBagOStuff extends BagOStuff {
 	protected function applyDefaultParams( $params ) {
 		return $params + [
 			'compress_threshold' => 1500,
-			'connect_timeout' => .5,
+			'connect_timeout' => 0.5,
 			'debug' => false
 		];
 	}
@@ -137,7 +137,7 @@ class MemcachedBagOStuff extends BagOStuff {
 		);
 
 		if ( $charsLeft < 0 ) {
-			return $keyspace . ':##' . md5( implode( ':', $args ) );
+			return $keyspace . ':BagOStuff-long-key:##' . md5( implode( ':', $args ) );
 		}
 
 		return $keyspace . ':' . implode( ':', $args );

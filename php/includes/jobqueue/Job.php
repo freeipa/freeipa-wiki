@@ -50,6 +50,12 @@ abstract class Job implements IJobSpecification {
 	/** @var callable[] */
 	protected $teardownCallbacks = [];
 
+	/** @var int Bitfield of JOB_* class constants */
+	protected $executionFlags = 0;
+
+	/** @var int Job must not be wrapped in the usual explicit LBFactory transaction round */
+	const JOB_NO_EXPLICIT_TRX_ROUND = 1;
+
 	/**
 	 * Run the job
 	 * @return bool Success
@@ -69,12 +75,22 @@ abstract class Job implements IJobSpecification {
 		global $wgJobClasses;
 
 		if ( isset( $wgJobClasses[$command] ) ) {
-			$class = $wgJobClasses[$command];
+			$handler = $wgJobClasses[$command];
 
-			$job = new $class( $title, $params );
-			$job->command = $command;
+			if ( is_callable( $handler ) ) {
+				$job = call_user_func( $handler, $title, $params );
+			} elseif ( class_exists( $handler ) ) {
+				$job = new $handler( $title, $params );
+			} else {
+				$job = null;
+			}
 
-			return $job;
+			if ( $job instanceof Job ) {
+				$job->command = $command;
+				return $job;
+			} else {
+				throw new InvalidArgumentException( "Cannot instantiate job '$command': bad spec!" );
+			}
 		}
 
 		throw new InvalidArgumentException( "Invalid job command '{$command}'" );
@@ -96,6 +112,15 @@ abstract class Job implements IJobSpecification {
 		if ( !isset( $this->params['requestId'] ) ) {
 			$this->params['requestId'] = WebRequest::getRequestId();
 		}
+	}
+
+	/**
+	 * @param int $flag JOB_* class constant
+	 * @return bool
+	 * @since 1.31
+	 */
+	public function hasExecutionFlag( $flag ) {
+		return ( $this->executionFlags && $flag ) === $flag;
 	}
 
 	/**
@@ -327,6 +352,7 @@ abstract class Job implements IJobSpecification {
 	 * @deprecated since 1.21
 	 */
 	public function insert() {
+		wfDeprecated( __METHOD__, '1.21' );
 		JobQueueGroup::singleton()->push( $this );
 		return true;
 	}

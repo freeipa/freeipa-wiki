@@ -33,7 +33,7 @@ use MediaWiki\MediaWikiServices;
  *
  * @ingroup SpecialPage
  */
-class SpecialPage {
+class SpecialPage implements MessageLocalizer {
 	// The canonical name of this special page
 	// Also used for the default <h1> heading, @see getDescription()
 	protected $mName;
@@ -383,7 +383,7 @@ class SpecialPage {
 			return true;
 		} elseif ( $securityStatus === AuthManager::SEC_REAUTH ) {
 			$request = $this->getRequest();
-			$title = SpecialPage::getTitleFor( 'Userlogin' );
+			$title = self::getTitleFor( 'Userlogin' );
 			$query = [
 				'returnto' => $this->getFullTitle()->getPrefixedDBkey(),
 				'returntoquery' => wfArrayToCgi( array_diff_key( $request->getQueryValues(),
@@ -456,7 +456,7 @@ class SpecialPage {
 		$searchEngine->setLimitOffset( $limit, $offset );
 		$searchEngine->setNamespaces( [] );
 		$result = $searchEngine->defaultPrefixSearch( $search );
-		return array_map( function( Title $t ) {
+		return array_map( function ( Title $t ) {
 			return $t->getPrefixedText();
 		}, $result );
 	}
@@ -615,6 +615,7 @@ class SpecialPage {
 	 * @deprecated since 1.23, use SpecialPage::getPageTitle
 	 */
 	function getTitle( $subpage = false ) {
+		wfDeprecated( __METHOD__, '1.23' );
 		return $this->getPageTitle( $subpage );
 	}
 
@@ -743,7 +744,7 @@ class SpecialPage {
 	 * @return Message
 	 * @see wfMessage
 	 */
-	public function msg( /* $args */ ) {
+	public function msg( $key /* $args */ ) {
 		$message = call_user_func_array(
 			[ $this->getContext(), 'msg' ],
 			func_get_args()
@@ -783,6 +784,10 @@ class SpecialPage {
 	 * @since 1.25
 	 */
 	public function addHelpLink( $to, $overrideBaseUrl = false ) {
+		if ( $this->including() ) {
+			return;
+		}
+
 		global $wgContLang;
 		$msg = $this->msg( $wgContLang->lc( $this->getName() ) . '-helppage' );
 
@@ -805,7 +810,7 @@ class SpecialPage {
 	public function getFinalGroupName() {
 		$name = $this->getName();
 
-		// Allow overbidding the group from the wiki side
+		// Allow overriding the group from the wiki side
 		$msg = $this->msg( 'specialpages-specialpagegroup-' . strtolower( $name ) )->inContentLanguage();
 		if ( !$msg->isBlank() ) {
 			$group = $msg->text();

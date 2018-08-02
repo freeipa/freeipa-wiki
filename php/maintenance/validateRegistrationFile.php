@@ -8,8 +8,8 @@ class ValidateRegistrationFile extends Maintenance {
 		$this->addArg( 'path', 'Path to extension.json/skin.json file.', true );
 	}
 	public function execute() {
-		$validator = new ExtensionJsonValidator( function( $msg ) {
-			$this->error( $msg, 1 );
+		$validator = new ExtensionJsonValidator( function ( $msg ) {
+			$this->fatalError( $msg );
 		} );
 		$validator->checkDependencies();
 		$path = $this->getArg( 0 );
@@ -17,10 +17,10 @@ class ValidateRegistrationFile extends Maintenance {
 			$validator->validate( $path );
 			$this->output( "$path validates against the schema!\n" );
 		} catch ( ExtensionJsonValidationError $e ) {
-			$this->error( $e->getMessage(), 1 );
+			$this->fatalError( $e->getMessage() );
 		}
 	}
 }
 
-$maintClass = 'ValidateRegistrationFile';
+$maintClass = ValidateRegistrationFile::class;
 require_once RUN_MAINTENANCE_IF_MAIN;

@@ -97,7 +97,7 @@ final class SessionBackend {
 	private $shutdown = false;
 
 	/**
-	 * @param SessionId $id Session ID object
+	 * @param SessionId $id
 	 * @param SessionInfo $info Session info to populate from
 	 * @param CachedBagOStuff $store Backend data store
 	 * @param LoggerInterface $logger
@@ -132,7 +132,7 @@ final class SessionBackend {
 		$this->forceHTTPS = $info->forceHTTPS();
 		$this->providerMetadata = $info->getProviderMetadata();
 
-		$blob = $store->get( wfMemcKey( 'MWSession', (string)$this->id ) );
+		$blob = $store->get( $store->makeKey( 'MWSession', (string)$this->id ) );
 		if ( !is_array( $blob ) ||
 			!isset( $blob['metadata'] ) || !is_array( $blob['metadata'] ) ||
 			!isset( $blob['data'] ) || !is_array( $blob['data'] )
@@ -243,13 +243,13 @@ final class SessionBackend {
 
 			if ( $restart ) {
 				session_id( (string)$this->id );
-				\MediaWiki\quietCall( 'session_start' );
+				\Wikimedia\quietCall( 'session_start' );
 			}
 
 			$this->autosave();
 
 			// Delete the data for the old session ID now
-			$this->store->delete( wfMemcKey( 'MWSession', $oldId ) );
+			$this->store->delete( $this->store->makeKey( 'MWSession', $oldId ) );
 		}
 	}
 
@@ -317,7 +317,7 @@ final class SessionBackend {
 
 			// Delete the session data, so the local cache-only write in
 			// self::save() doesn't get things out of sync with the backend.
-			$this->store->delete( wfMemcKey( 'MWSession', (string)$this->id ) );
+			$this->store->delete( $this->store->makeKey( 'MWSession', (string)$this->id ) );
 
 			$this->autosave();
 		}
@@ -729,7 +729,7 @@ final class SessionBackend {
 		$flags = $this->persist ? 0 : CachedBagOStuff::WRITE_CACHE_ONLY;
 		$flags |= CachedBagOStuff::WRITE_SYNC; // write to all datacenters
 		$this->store->set(
-			wfMemcKey( 'MWSession', (string)$this->id ),
+			$this->store->makeKey( 'MWSession', (string)$this->id ),
 			[
 				'data' => $this->data,
 				'metadata' => $metadata,
@@ -764,7 +764,7 @@ final class SessionBackend {
 						'session' => $this->id,
 				] );
 				session_id( (string)$this->id );
-				\MediaWiki\quietCall( 'session_start' );
+				\Wikimedia\quietCall( 'session_start' );
 			}
 		}
 	}

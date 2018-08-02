@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on July 30, 2007
- *
  * Copyright © 2007 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -61,18 +57,6 @@ class ApiQuerySearch extends ApiQueryGeneratorBase {
 		$interwiki = $params['interwiki'];
 		$searchInfo = array_flip( $params['info'] );
 		$prop = array_flip( $params['prop'] );
-
-		// Deprecated parameters
-		if ( isset( $prop['hasrelated'] ) ) {
-			$this->addDeprecation(
-				[ 'apiwarn-deprecation-parameter', 'srprop=hasrelated' ], 'action=search&srprop=hasrelated'
-			);
-		}
-		if ( isset( $prop['score'] ) ) {
-			$this->addDeprecation(
-				[ 'apiwarn-deprecation-parameter', 'srprop=score' ], 'action=search&srprop=score'
-			);
-		}
 
 		// Create search engine instance and set options
 		$search = $this->buildSearchEngine( $params );
@@ -245,6 +229,7 @@ class ApiQuerySearch extends ApiQueryGeneratorBase {
 
 		$title = $result->getTitle();
 		ApiQueryBase::addTitleInfo( $vals, $title );
+		$vals['pageid'] = $title->getArticleID();
 
 		if ( isset( $prop['size'] ) ) {
 			$vals['size'] = $result->getByteSize();
@@ -283,6 +268,16 @@ class ApiQuerySearch extends ApiQueryGeneratorBase {
 		if ( isset( $prop['isfilematch'] ) ) {
 			$vals['isfilematch'] = $result->isFileMatch();
 		}
+
+		if ( isset( $prop['extensiondata'] ) ) {
+			$extra = $result->getExtensionData();
+			// Add augmented data to the result. The data would be organized as a map:
+			// augmentorName => data
+			if ( $extra ) {
+				$vals['extensiondata'] = ApiResult::addMetadataToResultVars( $extra );
+			}
+		}
+
 		return $vals;
 	}
 
@@ -383,9 +378,14 @@ class ApiQuerySearch extends ApiQueryGeneratorBase {
 					'categorysnippet',
 					'score', // deprecated
 					'hasrelated', // deprecated
+					'extensiondata',
 				],
 				ApiBase::PARAM_ISMULTI => true,
 				ApiBase::PARAM_HELP_MSG_PER_VALUE => [],
+				ApiBase::PARAM_DEPRECATED_VALUES => [
+					'score' => true,
+					'hasrelated' => true
+				],
 			],
 			'interwiki' => false,
 			'enablerewrites' => false,

@@ -39,9 +39,9 @@ use Wikimedia\Rdbms\DBReplicationWaitError;
 class RefreshLinksJob extends Job {
 	/** @var float Cache parser output when it takes this long to render */
 	const PARSE_THRESHOLD_SEC = 1.0;
-	/** @var integer Lag safety margin when comparing root job times to last-refresh times */
+	/** @var int Lag safety margin when comparing root job times to last-refresh times */
 	const CLOCK_FUDGE = 10;
-	/** @var integer How many seconds to wait for replica DBs to catch up */
+	/** @var int How many seconds to wait for replica DBs to catch up */
 	const LAG_WAIT_TIMEOUT = 15;
 
 	function __construct( Title $title, array $params ) {
@@ -53,6 +53,7 @@ class RefreshLinksJob extends Job {
 			// Multiple pages per job make matches unlikely
 			!( isset( $params['pages'] ) && count( $params['pages'] ) != 1 )
 		);
+		$this->params += [ 'causeAction' => 'unknown', 'causeAgent' => 'unknown' ];
 	}
 
 	/**
@@ -102,6 +103,9 @@ class RefreshLinksJob extends Job {
 			// Carry over information for de-duplication
 			$extraParams = $this->getRootJobParams();
 			$extraParams['triggeredRecursive'] = true;
+			// Carry over cause information for logging
+			$extraParams['causeAction'] = $this->params['causeAction'];
+			$extraParams['causeAgent'] = $this->params['causeAgent'];
 			// Convert this into no more than $wgUpdateRowsPerJob RefreshLinks per-title
 			// jobs and possibly a recursive RefreshLinks job for the rest of the backlinks
 			$jobs = BacklinkJobUtils::partitionBacklinkJob(
@@ -207,7 +211,7 @@ class RefreshLinksJob extends Job {
 			if ( $page->getTouched() >= $this->params['rootJobTimestamp'] || $opportunistic ) {
 				// Cache is suspected to be up-to-date. As long as the cache rev ID matches
 				// and it reflects the job's triggering change, then it is usable.
-				$parserOutput = ParserCache::singleton()->getDirty( $page, $parserOptions );
+				$parserOutput = $services->getParserCache()->getDirty( $page, $parserOptions );
 				if ( !$parserOutput
 					|| $parserOutput->getCacheRevisionId() != $revision->getId()
 					|| $parserOutput->getCacheTime() < $skewedTimestamp
@@ -234,7 +238,7 @@ class RefreshLinksJob extends Job {
 				&& $parserOutput->isCacheable()
 			) {
 				$ctime = wfTimestamp( TS_MW, (int)$start ); // cache time
-				ParserCache::singleton()->save(
+				$services->getParserCache()->save(
 					$parserOutput, $page, $parserOptions, $ctime, $revision->getId()
 				);
 			}
@@ -254,6 +258,8 @@ class RefreshLinksJob extends Job {
 		$lbFactory->commitAndWaitForReplication( __METHOD__, $ticket );
 
 		foreach ( $updates as $update ) {
+			// Carry over cause in case so the update can do extra logging
+			$update->setCause( $this->params['causeAction'], $this->params['causeAgent'] );
 			// FIXME: This code probably shouldn't be here?
 			// Needed by things like Echo notifications which need
 			// to know which user caused the links update
@@ -279,15 +285,21 @@ class RefreshLinksJob extends Job {
 
 		InfoAction::invalidateCache( $title );
 
+		// Commit any writes here in case this method is called in a loop.
+		// In that case, the scoped lock will fail to be acquired.
+		$lbFactory->commitAndWaitForReplication( __METHOD__, $ticket );
+
 		return true;
 	}
 
 	public function getDeduplicationInfo() {
 		$info = parent::getDeduplicationInfo();
+		unset( $info['causeAction'] );
+		unset( $info['causeAgent'] );
 		if ( is_array( $info['params'] ) ) {
 			// For per-pages jobs, the job title is that of the template that changed
 			// (or similar), so remove that since it ruins duplicate detection
-			if ( isset( $info['pages'] ) ) {
+			if ( isset( $info['params']['pages'] ) ) {
 				unset( $info['namespace'] );
 				unset( $info['title'] );
 			}
@@ -297,6 +309,12 @@ class RefreshLinksJob extends Job {
 	}
 
 	public function workItemCount() {
-		return isset( $this->params['pages'] ) ? count( $this->params['pages'] ) : 1;
+		if ( !empty( $this->params['recursive'] ) ) {
+			return 0; // nothing actually refreshed
+		} elseif ( isset( $this->params['pages'] ) ) {
+			return count( $this->params['pages'] );
+		}
+
+		return 1; // one title
 	}
 }

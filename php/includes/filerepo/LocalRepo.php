@@ -34,17 +34,17 @@ use Wikimedia\Rdbms\IDatabase;
  */
 class LocalRepo extends FileRepo {
 	/** @var callable */
-	protected $fileFactory = [ 'LocalFile', 'newFromTitle' ];
+	protected $fileFactory = [ LocalFile::class, 'newFromTitle' ];
 	/** @var callable */
-	protected $fileFactoryKey = [ 'LocalFile', 'newFromKey' ];
+	protected $fileFactoryKey = [ LocalFile::class, 'newFromKey' ];
 	/** @var callable */
-	protected $fileFromRowFactory = [ 'LocalFile', 'newFromRow' ];
+	protected $fileFromRowFactory = [ LocalFile::class, 'newFromRow' ];
 	/** @var callable */
-	protected $oldFileFromRowFactory = [ 'OldLocalFile', 'newFromRow' ];
+	protected $oldFileFromRowFactory = [ OldLocalFile::class, 'newFromRow' ];
 	/** @var callable */
-	protected $oldFileFactory = [ 'OldLocalFile', 'newFromTitle' ];
+	protected $oldFileFactory = [ OldLocalFile::class, 'newFromTitle' ];
 	/** @var callable */
-	protected $oldFileFactoryKey = [ 'OldLocalFile', 'newFromKey' ];
+	protected $oldFileFactoryKey = [ OldLocalFile::class, 'newFromKey' ];
 
 	function __construct( array $info = null ) {
 		parent::__construct( $info );
@@ -91,7 +91,7 @@ class LocalRepo extends FileRepo {
 	 * interleave database locks with file operations, which is potentially a
 	 * remote operation.
 	 *
-	 * @param array $storageKeys
+	 * @param string[] $storageKeys
 	 *
 	 * @return Status
 	 */
@@ -274,14 +274,13 @@ class LocalRepo extends FileRepo {
 			);
 		};
 
-		$that = $this;
 		$applyMatchingFiles = function ( ResultWrapper $res, &$searchSet, &$finalFiles )
-			use ( $that, $fileMatchesSearch, $flags )
+			use ( $fileMatchesSearch, $flags )
 		{
 			global $wgContLang;
-			$info = $that->getInfo();
+			$info = $this->getInfo();
 			foreach ( $res as $row ) {
-				$file = $that->newFileFromRow( $row );
+				$file = $this->newFileFromRow( $row );
 				// There must have been a search for this DB key, but this has to handle the
 				// cases were title capitalization is different on the client and repo wikis.
 				$dbKeysLook = [ strtr( $file->getName(), ' ', '_' ) ];
@@ -311,8 +310,9 @@ class LocalRepo extends FileRepo {
 		}
 
 		if ( count( $imgNames ) ) {
-			$res = $dbr->select( 'image',
-				LocalFile::selectFields(), [ 'img_name' => $imgNames ], __METHOD__ );
+			$fileQuery = LocalFile::getQueryInfo();
+			$res = $dbr->select( $fileQuery['tables'], $fileQuery['fields'], [ 'img_name' => $imgNames ],
+				__METHOD__, [], $fileQuery['joins'] );
 			$applyMatchingFiles( $res, $searchSet, $finalFiles );
 		}
 
@@ -331,8 +331,10 @@ class LocalRepo extends FileRepo {
 		}
 
 		if ( count( $oiConds ) ) {
-			$res = $dbr->select( 'oldimage',
-				OldLocalFile::selectFields(), $dbr->makeList( $oiConds, LIST_OR ), __METHOD__ );
+			$fileQuery = OldLocalFile::getQueryInfo();
+			$res = $dbr->select( $fileQuery['tables'], $fileQuery['fields'],
+				$dbr->makeList( $oiConds, LIST_OR ),
+				__METHOD__, [], $fileQuery['joins'] );
 			$applyMatchingFiles( $res, $searchSet, $finalFiles );
 		}
 
@@ -369,16 +371,18 @@ class LocalRepo extends FileRepo {
 	 * SHA-1 content hash.
 	 *
 	 * @param string $hash A sha1 hash to look for
-	 * @return File[]
+	 * @return LocalFile[]
 	 */
 	function findBySha1( $hash ) {
 		$dbr = $this->getReplicaDB();
+		$fileQuery = LocalFile::getQueryInfo();
 		$res = $dbr->select(
-			'image',
-			LocalFile::selectFields(),
+			$fileQuery['tables'],
+			$fileQuery['fields'],
 			[ 'img_sha1' => $hash ],
 			__METHOD__,
-			[ 'ORDER BY' => 'img_name' ]
+			[ 'ORDER BY' => 'img_name' ],
+			$fileQuery['joins']
 		);
 
 		$result = [];
@@ -396,8 +400,8 @@ class LocalRepo extends FileRepo {
 	 *
 	 * Overrides generic implementation in FileRepo for performance reason
 	 *
-	 * @param array $hashes An array of hashes
-	 * @return array An Array of arrays or iterators of file objects and the hash as key
+	 * @param string[] $hashes An array of hashes
+	 * @return array[] An Array of arrays or iterators of file objects and the hash as key
 	 */
 	function findBySha1s( array $hashes ) {
 		if ( !count( $hashes ) ) {
@@ -405,12 +409,14 @@ class LocalRepo extends FileRepo {
 		}
 
 		$dbr = $this->getReplicaDB();
+		$fileQuery = LocalFile::getQueryInfo();
 		$res = $dbr->select(
-			'image',
-			LocalFile::selectFields(),
+			$fileQuery['tables'],
+			$fileQuery['fields'],
 			[ 'img_sha1' => $hashes ],
 			__METHOD__,
-			[ 'ORDER BY' => 'img_name' ]
+			[ 'ORDER BY' => 'img_name' ],
+			$fileQuery['joins']
 		);
 
 		$result = [];
@@ -428,19 +434,21 @@ class LocalRepo extends FileRepo {
 	 *
 	 * @param string $prefix The prefix to search for
 	 * @param int $limit The maximum amount of files to return
-	 * @return array
+	 * @return LocalFile[]
 	 */
 	public function findFilesByPrefix( $prefix, $limit ) {
 		$selectOptions = [ 'ORDER BY' => 'img_name', 'LIMIT' => intval( $limit ) ];
 
 		// Query database
 		$dbr = $this->getReplicaDB();
+		$fileQuery = LocalFile::getQueryInfo();
 		$res = $dbr->select(
-			'image',
-			LocalFile::selectFields(),
+			$fileQuery['tables'],
+			$fileQuery['fields'],
 			'img_name ' . $dbr->buildLike( $prefix, $dbr->anyString() ),
 			__METHOD__,
-			$selectOptions
+			$selectOptions,
+			$fileQuery['joins']
 		);
 
 		// Build file objects
@@ -483,7 +491,7 @@ class LocalRepo extends FileRepo {
 	 * @return Closure
 	 */
 	protected function getDBFactory() {
-		return function( $index ) {
+		return function ( $index ) {
 			return wfGetDB( $index );
 		};
 	}

@@ -2,65 +2,45 @@
 	/**
 	 * Filter item model
 	 *
-	 * @mixins OO.EventEmitter
+	 * @extends mw.rcfilters.dm.ItemModel
 	 *
 	 * @constructor
 	 * @param {string} param Filter param name
 	 * @param {mw.rcfilters.dm.FilterGroup} groupModel Filter group model
 	 * @param {Object} config Configuration object
-	 * @cfg {string} [group] The group this item belongs to
-	 * @cfg {string} [label] The label for the filter
-	 * @cfg {string} [description] The description of the filter
-	 * @cfg {boolean} [active=true] The filter is active and affecting the result
 	 * @cfg {string[]} [excludes=[]] A list of filter names this filter, if
 	 *  selected, makes inactive.
-	 * @cfg {boolean} [selected] The item is selected
 	 * @cfg {string[]} [subset] Defining the names of filters that are a subset of this filter
 	 * @cfg {Object} [conflicts] Defines the conflicts for this filter
-	 * @cfg {string} [cssClass] The class identifying the results that match this filter
+	 * @cfg {boolean} [visible=true] The visibility of the group
 	 */
 	mw.rcfilters.dm.FilterItem = function MwRcfiltersDmFilterItem( param, groupModel, config ) {
 		config = config || {};
 
+		this.groupModel = groupModel;
+
+		// Parent
+		mw.rcfilters.dm.FilterItem.parent.call( this, param, $.extend( {
+			namePrefix: this.groupModel.getNamePrefix()
+		}, config ) );
 		// Mixin constructor
 		OO.EventEmitter.call( this );
-
-		this.param = param;
-		this.groupModel = groupModel;
-		this.name = this.groupModel.getNamePrefix() + param;
-
-		this.label = config.label || this.name;
-		this.description = config.description;
-		this.selected = !!config.selected;
 
 		// Interaction definitions
 		this.subset = config.subset || [];
 		this.conflicts = config.conflicts || {};
 		this.superset = [];
+		this.visible = config.visible === undefined ? true : !!config.visible;
 
 		// Interaction states
 		this.included = false;
 		this.conflicted = false;
 		this.fullyCovered = false;
-
-		// Highlight
-		this.cssClass = config.cssClass;
-		this.highlightColor = null;
-		this.highlightEnabled = false;
 	};
 
 	/* Initialization */
 
-	OO.initClass( mw.rcfilters.dm.FilterItem );
-	OO.mixinClass( mw.rcfilters.dm.FilterItem, OO.EventEmitter );
-
-	/* Events */
-
-	/**
-	 * @event update
-	 *
-	 * The state of this filter has changed
-	 */
+	OO.inheritClass( mw.rcfilters.dm.FilterItem, mw.rcfilters.dm.ItemModel );
 
 	/* Methods */
 
@@ -79,26 +59,9 @@
 	};
 
 	/**
-	 * Get the name of this filter
-	 *
-	 * @return {string} Filter name
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getName = function () {
-		return this.name;
-	};
-
-	/**
-	 * Get the param name or value of this filter
-	 *
-	 * @return {string} Filter param name
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getParamName = function () {
-		return this.param;
-	};
-
-	/**
 	 * Get the message for the display area for the currently active conflict
 	 *
+	 * @private
 	 * @return {string} Conflict result message key
 	 */
 	mw.rcfilters.dm.FilterItem.prototype.getCurrentConflictResultMessage = function () {
@@ -117,6 +80,7 @@
 	/**
 	 * Get the details of the active conflict on this filter
 	 *
+	 * @private
 	 * @param {Object} conflicts Conflicts to examine
 	 * @param {string} [key='contextDescription'] Message key
 	 * @return {Object} Object with conflict message and conflict items
@@ -153,9 +117,7 @@
 	};
 
 	/**
-	 * Get the message representing the state of this model.
-	 *
-	 * @return {string} State message
+	 * @inheritdoc
 	 */
 	mw.rcfilters.dm.FilterItem.prototype.getStateMessage = function () {
 		var messageKey, details, superset,
@@ -177,7 +139,7 @@
 				// if the item is also not highlighted. See T161273
 				superset = this.getSuperset();
 				// For this message we need to collect the affecting superset
-				affectingItems = this.getGroupModel().getSelectedItems( this )
+				affectingItems = this.getGroupModel().findSelectedItems( this )
 					.filter( function ( item ) {
 						return superset.indexOf( item.getName() ) !== -1;
 					} )
@@ -187,7 +149,7 @@
 
 				messageKey = 'rcfilters-state-message-subset';
 			} else if ( this.isFullyCovered() && !this.isHighlighted() ) {
-				affectingItems = this.getGroupModel().getSelectedItems( this )
+				affectingItems = this.getGroupModel().findSelectedItems( this )
 					.map( function ( item ) {
 						return mw.msg( 'quotation-marks', item.getLabel() );
 					} );
@@ -228,33 +190,6 @@
 	};
 
 	/**
-	 * Get the label of this filter
-	 *
-	 * @return {string} Filter label
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getLabel = function () {
-		return this.label;
-	};
-
-	/**
-	 * Get the description of this filter
-	 *
-	 * @return {string} Filter description
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getDescription = function () {
-		return this.description;
-	};
-
-	/**
-	 * Get the default value of this filter
-	 *
-	 * @return {boolean} Filter default
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getDefault = function () {
-		return this.default;
-	};
-
-	/**
 	 * Get filter subset
 	 * This is a list of filter names that are defined to be included
 	 * when this filter is selected.
@@ -274,15 +209,6 @@
 	 */
 	mw.rcfilters.dm.FilterItem.prototype.getSuperset = function () {
 		return this.superset;
-	};
-
-	/**
-	 * Get the selected state of this filter
-	 *
-	 * @return {boolean} Filter is selected
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.isSelected = function () {
-		return this.selected;
 	};
 
 	/**
@@ -432,21 +358,6 @@
 	};
 
 	/**
-	 * Toggle the selected state of the item
-	 *
-	 * @param {boolean} [isSelected] Filter is selected
-	 * @fires update
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.toggleSelected = function ( isSelected ) {
-		isSelected = isSelected === undefined ? !this.selected : isSelected;
-
-		if ( this.selected !== isSelected ) {
-			this.selected = isSelected;
-			this.emit( 'update' );
-		}
-	};
-
-	/**
 	 * Toggle the fully covered state of the item
 	 *
 	 * @param {boolean} [isFullyCovered] Filter is fully covered
@@ -462,88 +373,26 @@
 	};
 
 	/**
-	 * Set the highlight color
+	 * Toggle the visibility of this item
 	 *
-	 * @param {string|null} highlightColor
+	 * @param {boolean} [isVisible] Item is visible
 	 */
-	mw.rcfilters.dm.FilterItem.prototype.setHighlightColor = function ( highlightColor ) {
-		if ( this.highlightColor !== highlightColor ) {
-			this.highlightColor = highlightColor;
+	mw.rcfilters.dm.FilterItem.prototype.toggleVisible = function ( isVisible ) {
+		isVisible = isVisible === undefined ? !this.visible : !!isVisible;
+
+		if ( this.visible !== isVisible ) {
+			this.visible = isVisible;
 			this.emit( 'update' );
 		}
 	};
 
 	/**
-	 * Clear the highlight color
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.clearHighlightColor = function () {
-		this.setHighlightColor( null );
-	};
-
-	/**
-	 * Get the highlight color, or null if none is configured
+	 * Check whether the item is visible
 	 *
-	 * @return {string|null}
+	 * @return {boolean} Item is visible
 	 */
-	mw.rcfilters.dm.FilterItem.prototype.getHighlightColor = function () {
-		return this.highlightColor;
+	mw.rcfilters.dm.FilterItem.prototype.isVisible = function () {
+		return this.visible;
 	};
 
-	/**
-	 * Get the CSS class that matches changes that fit this filter
-	 * or null if none is configured
-	 *
-	 * @return {string|null}
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.getCssClass = function () {
-		return this.cssClass;
-	};
-
-	/**
-	 * Toggle the highlight feature on and off for this filter.
-	 * It only works if highlight is supported for this filter.
-	 *
-	 * @param {boolean} enable Highlight should be enabled
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.toggleHighlight = function ( enable ) {
-		enable = enable === undefined ? !this.highlightEnabled : enable;
-
-		if ( !this.isHighlightSupported() ) {
-			return;
-		}
-
-		if ( enable === this.highlightEnabled ) {
-			return;
-		}
-
-		this.highlightEnabled = enable;
-		this.emit( 'update' );
-	};
-
-	/**
-	 * Check if the highlight feature is currently enabled for this filter
-	 *
-	 * @return {boolean}
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.isHighlightEnabled = function () {
-		return !!this.highlightEnabled;
-	};
-
-	/**
-	 * Check if the highlight feature is supported for this filter
-	 *
-	 * @return {boolean}
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.isHighlightSupported = function () {
-		return !!this.getCssClass();
-	};
-
-	/**
-	 * Check if the filter is currently highlighted
-	 *
-	 * @return {boolean}
-	 */
-	mw.rcfilters.dm.FilterItem.prototype.isHighlighted = function () {
-		return this.isHighlightEnabled() && !!this.getHighlightColor();
-	};
 }( mediaWiki ) );

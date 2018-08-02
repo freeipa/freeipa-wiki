@@ -2,7 +2,7 @@
 /**
  * Contain classes to list log entries
  *
- * Copyright © 2004 Brion Vibber <brion@pobox.com>, 2008 Aaron Schulz
+ * Copyright © 2004 Brion Vibber <brion@pobox.com>
  * https://www.mediawiki.org/
  *
  * This program is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
  * @file
  */
 
+use MediaWiki\Linker\LinkRenderer;
 use MediaWiki\MediaWikiServices;
 use Wikimedia\Rdbms\IDatabase;
 
@@ -49,17 +50,21 @@ class LogEventsList extends ContextSource {
 	protected $allowedActions = null;
 
 	/**
-	 * Constructor.
+	 * @var LinkRenderer|null
+	 */
+	private $linkRenderer;
+
+	/**
 	 * The first two parameters used to be $skin and $out, but now only a context
 	 * is needed, that's why there's a second unused parameter.
 	 *
 	 * @param IContextSource|Skin $context Context to use; formerly it was
 	 *   a Skin object. Use of Skin is deprecated.
-	 * @param null $unused Unused; used to be an OutputPage object.
+	 * @param LinkRenderer|null $linkRenderer previously unused
 	 * @param int $flags Can be a combination of self::NO_ACTION_LINK,
 	 *   self::NO_EXTRA_USER_LINKS or self::USE_CHECKBOXES.
 	 */
-	public function __construct( $context, $unused = null, $flags = 0 ) {
+	public function __construct( $context, $linkRenderer = null, $flags = 0 ) {
 		if ( $context instanceof IContextSource ) {
 			$this->setContext( $context );
 		} else {
@@ -69,6 +74,21 @@ class LogEventsList extends ContextSource {
 
 		$this->flags = $flags;
 		$this->showTagEditUI = ChangeTags::showTagEditingUI( $this->getUser() );
+		if ( $linkRenderer instanceof LinkRenderer ) {
+			$this->linkRenderer = $linkRenderer;
+		}
+	}
+
+	/**
+	 * @since 1.30
+	 * @return LinkRenderer
+	 */
+	protected function getLinkRenderer() {
+		if ( $this->linkRenderer !== null ) {
+			return $this->linkRenderer;
+		} else {
+			return MediaWikiServices::getInstance()->getLinkRenderer();
+		}
 	}
 
 	/**
@@ -78,8 +98,9 @@ class LogEventsList extends ContextSource {
 	 * @param string $user
 	 * @param string $page
 	 * @param string $pattern
-	 * @param int $year Year
-	 * @param int $month Month
+	 * @param int|string $year Use 0 to start with no year preselected.
+	 * @param int|string $month A month in the 1..12 range. Use 0 to start with no month
+	 *  preselected.
 	 * @param array $filter
 	 * @param string $tagFilter Tag to select by default
 	 * @param string $action
@@ -149,7 +170,7 @@ class LogEventsList extends ContextSource {
 		// Option value -> message mapping
 		$links = [];
 		$hiddens = ''; // keep track for "go" button
-		$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
+		$linkRenderer = $this->getLinkRenderer();
 		foreach ( $filter as $type => $val ) {
 			// Should the below assignment be outside the foreach?
 			// Then it would have to be copied. Not certain what is more expensive.
@@ -359,6 +380,7 @@ class LogEventsList extends ContextSource {
 		$entry = DatabaseLogEntry::newFromRow( $row );
 		$formatter = LogFormatter::newFromEntry( $entry );
 		$formatter->setContext( $this->getContext() );
+		$formatter->setLinkRenderer( $this->getLinkRenderer() );
 		$formatter->setShowUserToolLinks( !( $this->flags & self::NO_EXTRA_USER_LINKS ) );
 
 		$time = htmlspecialchars( $this->getLanguage()->userTimeAndDate(
@@ -390,13 +412,22 @@ class LogEventsList extends ContextSource {
 			[ 'mw-logline-' . $entry->getType() ],
 			$newClasses
 		);
+		$attribs = [
+			'data-mw-logid' => $entry->getId(),
+			'data-mw-logaction' => $entry->getFullType(),
+		];
+		$ret = "$del $time $action $comment $revert $tagDisplay";
 
-		return Html::rawElement( 'li', [ 'class' => $classes ],
-			"$del $time $action $comment $revert $tagDisplay" ) . "\n";
+		// Let extensions add data
+		Hooks::run( 'LogEventsListLineEnding', [ $this, &$ret, $entry, &$classes, &$attribs ] );
+		$attribs = wfArrayFilterByKey( $attribs, [ Sanitizer::class, 'isReservedDataAttribute' ] );
+		$attribs['class'] = implode( ' ', $classes );
+
+		return Html::rawElement( 'li', $attribs, $ret ) . "\n";
 	}
 
 	/**
-	 * @param stdClass $row Row
+	 * @param stdClass $row
 	 * @return string
 	 */
 	private function getShowHideLinks( $row ) {
@@ -466,7 +497,7 @@ class LogEventsList extends ContextSource {
 	}
 
 	/**
-	 * @param stdClass $row Row
+	 * @param stdClass $row
 	 * @param string|array $type
 	 * @param string|array $action
 	 * @param string $right
@@ -491,7 +522,7 @@ class LogEventsList extends ContextSource {
 	 * Determine if the current user is allowed to view a particular
 	 * field of this log row, if it's marked as deleted.
 	 *
-	 * @param stdClass $row Row
+	 * @param stdClass $row
 	 * @param int $field
 	 * @param User $user User to check, or null to use $wgUser
 	 * @return bool
@@ -528,7 +559,7 @@ class LogEventsList extends ContextSource {
 	}
 
 	/**
-	 * @param stdClass $row Row
+	 * @param stdClass $row
 	 * @param int $field One of DELETED_* bitfield constants
 	 * @return bool
 	 */
@@ -539,7 +570,7 @@ class LogEventsList extends ContextSource {
 	/**
 	 * Show log extract. Either with text and a box (set $msgKey) or without (don't set $msgKey)
 	 *
-	 * @param OutputPage|string $out By-reference
+	 * @param OutputPage|string &$out
 	 * @param string|array $types Log types to show
 	 * @param string|Title $page The page title to show log entries for
 	 * @param string $user The user who made the log entries
@@ -598,8 +629,11 @@ class LogEventsList extends ContextSource {
 			$context = RequestContext::getMain();
 		}
 
+		// FIXME: Figure out how to inject this
+		$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
+
 		# Insert list of top 50 (or top $lim) items
-		$loglist = new LogEventsList( $context, null, $flags );
+		$loglist = new LogEventsList( $context, $linkRenderer, $flags );
 		$pager = new LogPager( $loglist, $types, $user, $page, '', $conds );
 		if ( !$useRequestParams ) {
 			# Reset vars that may have been taken from the request
@@ -677,7 +711,7 @@ class LogEventsList extends ContextSource {
 				$urlParam = array_merge( $urlParam, $extraUrlParams );
 			}
 
-			$s .= MediaWikiServices::getInstance()->getLinkRenderer()->makeKnownLink(
+			$s .= $linkRenderer->makeKnownLink(
 				SpecialPage::getTitleFor( 'Log' ),
 				$context->msg( 'log-fulllog' )->text(),
 				[],

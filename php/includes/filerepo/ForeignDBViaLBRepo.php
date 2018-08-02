@@ -37,10 +37,10 @@ class ForeignDBViaLBRepo extends LocalRepo {
 	protected $tablePrefix;
 
 	/** @var array */
-	protected $fileFactory = [ 'ForeignDBFile', 'newFromTitle' ];
+	protected $fileFactory = [ ForeignDBFile::class, 'newFromTitle' ];
 
 	/** @var array */
-	protected $fileFromRowFactory = [ 'ForeignDBFile', 'newFromRow' ];
+	protected $fileFromRowFactory = [ ForeignDBFile::class, 'newFromRow' ];
 
 	/** @var bool */
 	protected $hasSharedCache;
@@ -73,7 +73,7 @@ class ForeignDBViaLBRepo extends LocalRepo {
 	 * @return Closure
 	 */
 	protected function getDBFactory() {
-		return function( $index ) {
+		return function ( $index ) {
 			return wfGetLB( $this->wiki )->getConnectionRef( $index, [], $this->wiki );
 		};
 	}

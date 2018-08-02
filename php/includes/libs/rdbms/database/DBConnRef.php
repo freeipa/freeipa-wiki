@@ -8,7 +8,7 @@ use InvalidArgumentException;
  * Helper class to handle automatically marking connections as reusable (via RAII pattern)
  * as well handling deferring the actual network connection until the handle is used
  *
- * @note: proxy methods are defined explicity to avoid interface errors
+ * @note: proxy methods are defined explicitly to avoid interface errors
  * @ingroup Database
  * @since 1.22
  */
@@ -23,16 +23,17 @@ class DBConnRef implements IDatabase {
 	const FLD_INDEX = 0;
 	const FLD_GROUP = 1;
 	const FLD_DOMAIN = 2;
+	const FLD_FLAGS = 3;
 
 	/**
 	 * @param ILoadBalancer $lb Connection manager for $conn
-	 * @param Database|array $conn New connection handle or (server index, query groups, domain)
+	 * @param Database|array $conn Database handle or (server index, query groups, domain, flags)
 	 */
 	public function __construct( ILoadBalancer $lb, $conn ) {
 		$this->lb = $lb;
 		if ( $conn instanceof Database ) {
 			$this->conn = $conn; // live handle
-		} elseif ( count( $conn ) >= 3 && $conn[self::FLD_DOMAIN] !== false ) {
+		} elseif ( count( $conn ) >= 4 && $conn[self::FLD_DOMAIN] !== false ) {
 			$this->params = $conn;
 		} else {
 			throw new InvalidArgumentException( "Missing lazy connection arguments." );
@@ -41,8 +42,8 @@ class DBConnRef implements IDatabase {
 
 	function __call( $name, array $arguments ) {
 		if ( $this->conn === null ) {
-			list( $db, $groups, $wiki ) = $this->params;
-			$this->conn = $this->lb->getConnection( $db, $groups, $wiki );
+			list( $db, $groups, $wiki, $flags ) = $this->params;
+			$this->conn = $this->lb->getConnection( $db, $groups, $wiki, $flags );
 		}
 
 		return call_user_func_array( [ $this->conn, $name ], $arguments );
@@ -121,6 +122,10 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function pendingWriteCallers() {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function pendingWriteRowsAffected() {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -206,10 +211,6 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
-	public function fieldInfo( $table, $field ) {
-		return $this->__call( __FUNCTION__, func_get_args() );
-	}
-
 	public function affectedRows() {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
@@ -226,15 +227,7 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
-	public function reportConnectionError( $error = 'Unknown error' ) {
-		return $this->__call( __FUNCTION__, func_get_args() );
-	}
-
 	public function query( $sql, $fname = __METHOD__, $tempIgnore = false ) {
-		return $this->__call( __FUNCTION__, func_get_args() );
-	}
-
-	public function reportQueryError( $error, $errno, $sql, $fname, $tempIgnore = false ) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -243,13 +236,13 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function selectField(
-		$table, $var, $cond = '', $fname = __METHOD__, $options = []
+		$table, $var, $cond = '', $fname = __METHOD__, $options = [], $join_conds = []
 	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
 	public function selectFieldValues(
-		$table, $var, $cond = '', $fname = __METHOD__, $options = []
+		$table, $var, $cond = '', $fname = __METHOD__, $options = [], $join_conds = []
 	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
@@ -276,7 +269,7 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function estimateRowCount(
-		$table, $vars = '*', $conds = '', $fname = __METHOD__, $options = []
+		$table, $vars = '*', $conds = '', $fname = __METHOD__, $options = [], $join_conds = []
 	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
@@ -296,10 +289,6 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function tableExists( $table, $fname = __METHOD__ ) {
-		return $this->__call( __FUNCTION__, func_get_args() );
-	}
-
-	public function indexUnique( $table, $index ) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -345,7 +334,26 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
+	public function buildSubstring( $input, $startPosition, $length = null ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
 	public function buildStringCast( $field ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function buildIntegerCast( $field ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function buildSelectSubquery(
+		$table, $vars, $conds = '', $fname = __METHOD__,
+		$options = [], $join_conds = []
+	) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function databasesAreIndependent() {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -403,7 +411,7 @@ class DBConnRef implements IDatabase {
 
 	public function insertSelect(
 		$destTable, $srcTable, $varMap, $conds,
-		$fname = __METHOD__, $insertOptions = [], $selectOptions = []
+		$fname = __METHOD__, $insertOptions = [], $selectOptions = [], $selectJoinConds = []
 	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
@@ -413,6 +421,13 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function unionQueries( $sqls, $all ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function unionConditionPermutations(
+		$table, $vars, array $permute_conds, $extra_conds = '', $fname = __METHOD__,
+		$options = [], $join_conds = []
+	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -436,11 +451,15 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
-	public function wasErrorReissuable() {
+	public function wasConnectionLoss() {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
 	public function wasReadOnlyError() {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function wasErrorReissuable() {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -476,7 +495,9 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
-	public function startAtomic( $fname = __METHOD__ ) {
+	public function startAtomic(
+		$fname = __METHOD__, $cancelable = IDatabase::ATOMIC_NOT_CANCELABLE
+	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -484,7 +505,13 @@ class DBConnRef implements IDatabase {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
-	public function doAtomicSection( $fname, callable $callback ) {
+	public function cancelAtomic( $fname = __METHOD__, AtomicSectionIdentifier $sectionId = null ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function doAtomicSection(
+		$fname, callable $callback, $cancelable = self::ATOMIC_NOT_CANCELABLE
+	) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -501,10 +528,6 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function flushSnapshot( $fname = __METHOD__ ) {
-		return $this->__call( __FUNCTION__, func_get_args() );
-	}
-
-	public function listTables( $prefix = null, $fname = __METHOD__ ) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 
@@ -591,6 +614,10 @@ class DBConnRef implements IDatabase {
 	}
 
 	public function setTableAliases( array $aliases ) {
+		return $this->__call( __FUNCTION__, func_get_args() );
+	}
+
+	public function setIndexAliases( array $aliases ) {
 		return $this->__call( __FUNCTION__, func_get_args() );
 	}
 

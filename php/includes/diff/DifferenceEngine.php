@@ -21,9 +21,7 @@
  * @ingroup DifferenceEngine
  */
 use MediaWiki\MediaWikiServices;
-
-/** @deprecated use class constant instead */
-define( 'MW_DIFF_VERSION', '1.11a' );
+use MediaWiki\Shell\Shell;
 
 /**
  * @todo document
@@ -36,7 +34,7 @@ class DifferenceEngine extends ContextSource {
 	 * fixes important bugs or such to force cached diff views to
 	 * clear.
 	 */
-	const DIFF_VERSION = MW_DIFF_VERSION;
+	const DIFF_VERSION = '1.12';
 
 	/** @var int */
 	public $mOldid;
@@ -104,7 +102,6 @@ class DifferenceEngine extends ContextSource {
 	/**#@-*/
 
 	/**
-	 * Constructor
 	 * @param IContextSource $context Context to use, anything else will be ignored
 	 * @param int $old Old ID we want to show and diff with.
 	 * @param string|int $new Either revision ID or 'prev' or 'next'. Default: 0.
@@ -182,9 +179,15 @@ class DifferenceEngine extends ContextSource {
 	public function deletedLink( $id ) {
 		if ( $this->getUser()->isAllowed( 'deletedhistory' ) ) {
 			$dbr = wfGetDB( DB_REPLICA );
-			$row = $dbr->selectRow( 'archive', '*',
+			$arQuery = Revision::getArchiveQueryInfo();
+			$row = $dbr->selectRow(
+				$arQuery['tables'],
+				array_merge( $arQuery['fields'], [ 'ar_namespace', 'ar_title' ] ),
 				[ 'ar_rev_id' => $id ],
-				__METHOD__ );
+				__METHOD__,
+				[],
+				$arQuery['joins']
+			);
 			if ( $row ) {
 				$rev = Revision::newFromArchiveRow( $row );
 				$title = Title::makeTitleSafe( $row->ar_namespace, $row->ar_title );
@@ -377,6 +380,11 @@ class DifferenceEngine extends ContextSource {
 			}
 		}
 
+		$out->addJsConfigVars( [
+			'wgDiffOldId' => $this->mOldid,
+			'wgDiffNewId' => $this->mNewid,
+		] );
+
 		# Make "next revision link"
 		# Skip next link on the top revision
 		if ( $samePage && !$this->mNewRev->isCurrent() ) {
@@ -534,7 +542,7 @@ class DifferenceEngine extends ContextSource {
 				[
 					'rc_timestamp' => $db->timestamp( $this->mNewRev->getTimestamp() ),
 					'rc_this_oldid' => $this->mNewid,
-					'rc_patrolled' => 0
+					'rc_patrolled' => RecentChange::PRC_UNPATROLLED
 				],
 				__METHOD__
 			);
@@ -596,14 +604,15 @@ class DifferenceEngine extends ContextSource {
 		$out->addHTML( "<hr class='diff-hr' id='mw-oldid' />
 		<h2 class='diff-currentversion-title'>{$revHeader}</h2>\n" );
 		# Page content may be handled by a hooked call instead...
-		# @codingStandardsIgnoreStart Ignoring long lines.
 		if ( Hooks::run( 'ArticleContentOnDiff', [ $this, $out ] ) ) {
 			$this->loadNewText();
 			$out->setRevisionId( $this->mNewid );
 			$out->setRevisionTimestamp( $this->mNewRev->getTimestamp() );
 			$out->setArticleFlag( true );
 
-			if ( !Hooks::run( 'ArticleContentViewCustom', [ $this->mNewContent, $this->mNewPage, $out ] ) ) {
+			if ( !Hooks::run( 'ArticleContentViewCustom',
+				[ $this->mNewContent, $this->mNewPage, $out ] )
+			) {
 				// Handled by extension
 			} else {
 				// Normal page
@@ -622,13 +631,17 @@ class DifferenceEngine extends ContextSource {
 				# WikiPage::getParserOutput() should not return false, but just in case
 				if ( $parserOutput ) {
 					// Allow extensions to change parser output here
-					if ( Hooks::run( 'DifferenceEngineRenderRevisionAddParserOutput', [ $this, $out, $parserOutput, $wikiPage ] ) ) {
-						$out->addParserOutput( $parserOutput );
+					if ( Hooks::run( 'DifferenceEngineRenderRevisionAddParserOutput',
+						[ $this, $out, $parserOutput, $wikiPage ] )
+					) {
+						$out->addParserOutput( $parserOutput, [
+							'enableSectionEditLinks' => $this->mNewRev->isCurrent()
+								&& $this->mNewRev->getTitle()->quickUserCan( 'edit', $this->getUser() ),
+						] );
 					}
 				}
 			}
 		}
-		# @codingStandardsIgnoreEnd
 
 		// Allow extensions to optionally not show the final patrolled link
 		if ( Hooks::run( 'DifferenceEngineRenderRevisionShowFinalPatrolLink' ) ) {
@@ -637,13 +650,14 @@ class DifferenceEngine extends ContextSource {
 		}
 	}
 
+	/**
+	 * @param WikiPage $page
+	 * @param Revision $rev
+	 *
+	 * @return ParserOutput|bool False if the revision was not found
+	 */
 	protected function getParserOutput( WikiPage $page, Revision $rev ) {
 		$parserOptions = $page->makeParserOptions( $this->getContext() );
-
-		if ( !$rev->isCurrent() || !$rev->getTitle()->quickUserCan( 'edit', $this->getUser() ) ) {
-			$parserOptions->setEditSection( false );
-		}
-
 		$parserOutput = $page->getParserOutput( $parserOptions, $rev->getId() );
 
 		return $parserOutput;
@@ -740,14 +754,22 @@ class DifferenceEngine extends ContextSource {
 		$key = false;
 		$cache = ObjectCache::getMainWANInstance();
 		if ( $this->mOldid && $this->mNewid ) {
+			// Check if subclass is still using the old way
+			// for backwards-compatibility
 			$key = $this->getDiffBodyCacheKey();
+			if ( $key === null ) {
+				$key = call_user_func_array(
+					[ $cache, 'makeKey' ],
+					$this->getDiffBodyCacheKeyParams()
+				);
+			}
 
 			// Try cache
 			if ( !$this->mRefreshCache ) {
 				$difftext = $cache->get( $key );
 				if ( $difftext ) {
 					wfIncrStats( 'diff_cache.hit' );
-					$difftext = $this->localiseLineNumbers( $difftext );
+					$difftext = $this->localiseDiff( $difftext );
 					$difftext .= "\n<!-- diff cache key $key -->\n";
 
 					return $difftext;
@@ -775,9 +797,9 @@ class DifferenceEngine extends ContextSource {
 		} else {
 			wfIncrStats( 'diff_cache.uncacheable' );
 		}
-		// Replace line numbers with the text in the user's language
+		// localise line numbers and title attribute text
 		if ( $difftext !== false ) {
-			$difftext = $this->localiseLineNumbers( $difftext );
+			$difftext = $this->localiseDiff( $difftext );
 		}
 
 		return $difftext;
@@ -786,18 +808,49 @@ class DifferenceEngine extends ContextSource {
 	/**
 	 * Returns the cache key for diff body text or content.
 	 *
+	 * @deprecated since 1.31, use getDiffBodyCacheKeyParams() instead
 	 * @since 1.23
 	 *
 	 * @throws MWException
-	 * @return string
+	 * @return string|null
 	 */
 	protected function getDiffBodyCacheKey() {
+		return null;
+	}
+
+	/**
+	 * Get the cache key parameters
+	 *
+	 * Subclasses can replace the first element in the array to something
+	 * more specific to the type of diff (e.g. "inline-diff"), or append
+	 * if the cache should vary on more things. Overriding entirely should
+	 * be avoided.
+	 *
+	 * @since 1.31
+	 *
+	 * @return array
+	 * @throws MWException
+	 */
+	protected function getDiffBodyCacheKeyParams() {
 		if ( !$this->mOldid || !$this->mNewid ) {
 			throw new MWException( 'mOldid and mNewid must be set to get diff cache key.' );
 		}
 
-		return wfMemcKey( 'diff', 'version', self::DIFF_VERSION,
-			'oldid', $this->mOldid, 'newid', $this->mNewid );
+		$engine = $this->getEngine();
+		$params = [
+			'diff',
+			$engine,
+			self::DIFF_VERSION,
+			"old-{$this->mOldid}",
+			"rev-{$this->mNewid}"
+		];
+
+		if ( $engine === 'wikidiff2' ) {
+			$params[] = phpversion( 'wikidiff2' );
+			$params[] = $this->getConfig()->get( 'WikiDiff2MovedParagraphDetectionCutoff' );
+		}
+
+		return $params;
 	}
 
 	/**
@@ -847,7 +900,7 @@ class DifferenceEngine extends ContextSource {
 	 * @return bool|string
 	 */
 	public function generateTextDiffBody( $otext, $ntext ) {
-		$diff = function() use ( $otext, $ntext ) {
+		$diff = function () use ( $otext, $ntext ) {
 			$time = microtime( true );
 
 			$result = $this->textDiff( $otext, $ntext );
@@ -867,7 +920,7 @@ class DifferenceEngine extends ContextSource {
 		 * @param Status $status
 		 * @throws FatalError
 		 */
-		$error = function( $status ) {
+		$error = function ( $status ) {
 			throw new FatalError( $status->getWikiText() );
 		};
 
@@ -884,18 +937,14 @@ class DifferenceEngine extends ContextSource {
 	}
 
 	/**
-	 * Generates diff, to be wrapped internally in a logging/instrumentation
+	 * Process $wgExternalDiffEngine and get a sane, usable engine
 	 *
-	 * @param string $otext Old text, must be already segmented
-	 * @param string $ntext New text, must be already segmented
-	 * @return bool|string
+	 * @return bool|string 'wikidiff2', path to an executable, or false
 	 */
-	protected function textDiff( $otext, $ntext ) {
-		global $wgExternalDiffEngine, $wgContLang;
-
-		$otext = str_replace( "\r\n", "\n", $otext );
-		$ntext = str_replace( "\r\n", "\n", $ntext );
-
+	private function getEngine() {
+		global $wgExternalDiffEngine;
+		// We use the global here instead of Config because we write to the value,
+		// and Config is not mutable.
 		if ( $wgExternalDiffEngine == 'wikidiff' || $wgExternalDiffEngine == 'wikidiff3' ) {
 			wfDeprecated( "\$wgExternalDiffEngine = '{$wgExternalDiffEngine}'", '1.27' );
 			$wgExternalDiffEngine = false;
@@ -908,14 +957,64 @@ class DifferenceEngine extends ContextSource {
 			$wgExternalDiffEngine = false;
 		}
 
-		if ( function_exists( 'wikidiff2_do_diff' ) && $wgExternalDiffEngine === false ) {
-			# Better external diff engine, the 2 may some day be dropped
-			# This one does the escaping and segmenting itself
-			$text = wikidiff2_do_diff( $otext, $ntext, 2 );
+		if ( is_string( $wgExternalDiffEngine ) && is_executable( $wgExternalDiffEngine ) ) {
+			return $wgExternalDiffEngine;
+		} elseif ( $wgExternalDiffEngine === false && function_exists( 'wikidiff2_do_diff' ) ) {
+			return 'wikidiff2';
+		} else {
+			// Native PHP
+			return false;
+		}
+	}
+
+	/**
+	 * Generates diff, to be wrapped internally in a logging/instrumentation
+	 *
+	 * @param string $otext Old text, must be already segmented
+	 * @param string $ntext New text, must be already segmented
+	 * @return bool|string
+	 */
+	protected function textDiff( $otext, $ntext ) {
+		global $wgContLang;
+
+		$otext = str_replace( "\r\n", "\n", $otext );
+		$ntext = str_replace( "\r\n", "\n", $ntext );
+
+		$engine = $this->getEngine();
+
+		// Better external diff engine, the 2 may some day be dropped
+		// This one does the escaping and segmenting itself
+		if ( $engine === 'wikidiff2' ) {
+			$wikidiff2Version = phpversion( 'wikidiff2' );
+			if (
+				$wikidiff2Version !== false &&
+				version_compare( $wikidiff2Version, '1.5.0', '>=' )
+			) {
+				$text = wikidiff2_do_diff(
+					$otext,
+					$ntext,
+					2,
+					$this->getConfig()->get( 'WikiDiff2MovedParagraphDetectionCutoff' )
+				);
+			} else {
+				// Don't pass the 4th parameter for compatibility with older versions of wikidiff2
+				$text = wikidiff2_do_diff(
+					$otext,
+					$ntext,
+					2
+				);
+
+				// Log a warning in case the configuration value is set to not silently ignore it
+				if ( $this->getConfig()->get( 'WikiDiff2MovedParagraphDetectionCutoff' ) > 0 ) {
+					wfLogWarning( '$wgWikiDiff2MovedParagraphDetectionCutoff is set but has no
+						effect since the used version of WikiDiff2 does not support it.' );
+				}
+			}
+
 			$text .= $this->debug( 'wikidiff2' );
 
 			return $text;
-		} elseif ( $wgExternalDiffEngine !== false && is_executable( $wgExternalDiffEngine ) ) {
+		} elseif ( $engine !== false ) {
 			# Diff via the shell
 			$tmpDir = wfTempDir();
 			$tempName1 = tempnam( $tmpDir, 'diff_' );
@@ -933,9 +1032,17 @@ class DifferenceEngine extends ContextSource {
 			fwrite( $tempFile2, $ntext );
 			fclose( $tempFile1 );
 			fclose( $tempFile2 );
-			$cmd = wfEscapeShellArg( $wgExternalDiffEngine, $tempName1, $tempName2 );
-			$difftext = wfShellExec( $cmd );
-			$difftext .= $this->debug( "external $wgExternalDiffEngine" );
+			$cmd = [ $engine, $tempName1, $tempName2 ];
+			$result = Shell::command( $cmd )
+				->execute();
+			$exitCode = $result->getExitCode();
+			if ( $exitCode !== 0 ) {
+				throw new Exception( "External diff command returned code {$exitCode}. Stderr: "
+					. wfEscapeWikiText( $result->getStderr() )
+				);
+			}
+			$difftext = $result->getStdout();
+			$difftext .= $this->debug( "external $engine" );
 			unlink( $tempName1 );
 			unlink( $tempName2 );
 
@@ -948,6 +1055,7 @@ class DifferenceEngine extends ContextSource {
 		$diffs = new Diff( $ota, $nta );
 		$formatter = new TableDiffFormatter();
 		$difftext = $wgContLang->unsegmentForDiff( $formatter->format( $diffs ) );
+		$difftext .= $this->debug( 'native PHP' );
 
 		return $difftext;
 	}
@@ -977,6 +1085,22 @@ class DifferenceEngine extends ContextSource {
 	}
 
 	/**
+	 * Localise diff output
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	private function localiseDiff( $text ) {
+		$text = $this->localiseLineNumbers( $text );
+		if ( $this->getEngine() === 'wikidiff2' &&
+			version_compare( phpversion( 'wikidiff2' ), '1.5.1', '>=' )
+		) {
+			$text = $this->addLocalisedTitleTooltips( $text );
+		}
+		return $text;
+	}
+
+	/**
 	 * Replace line numbers with the text in the user's language
 	 *
 	 * @param string $text
@@ -997,6 +1121,31 @@ class DifferenceEngine extends ContextSource {
 		}
 
 		return $this->msg( 'lineno' )->numParams( $matches[1] )->escaped();
+	}
+
+	/**
+	 * Add title attributes for tooltips on moved paragraph indicators
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	private function addLocalisedTitleTooltips( $text ) {
+		return preg_replace_callback(
+			'/class="mw-diff-movedpara-(left|right)"/',
+			[ $this, 'addLocalisedTitleTooltipsCb' ],
+			$text
+		);
+	}
+
+	/**
+	 * @param array $matches
+	 * @return string
+	 */
+	private function addLocalisedTitleTooltipsCb( array $matches ) {
+		$key = $matches[1] === 'right' ?
+			'diff-paragraph-moved-toold' :
+			'diff-paragraph-moved-tonew';
+		return $matches[0] . ' title="' . $this->msg( $key )->escaped() . '"';
 	}
 
 	/**
@@ -1145,17 +1294,17 @@ class DifferenceEngine extends ContextSource {
 
 		if ( !$diff && !$otitle ) {
 			$header .= "
-			<tr style='vertical-align: top;' lang='{$userLang}'>
-			<td class='diff-ntitle'>{$ntitle}</td>
+			<tr class=\"diff-title\" lang=\"{$userLang}\">
+			<td class=\"diff-ntitle\">{$ntitle}</td>
 			</tr>";
 			$multiColspan = 1;
 		} else {
 			if ( $diff ) { // Safari/Chrome show broken output if cols not used
 				$header .= "
-				<col class='diff-marker' />
-				<col class='diff-content' />
-				<col class='diff-marker' />
-				<col class='diff-content' />";
+				<col class=\"diff-marker\" />
+				<col class=\"diff-content\" />
+				<col class=\"diff-marker\" />
+				<col class=\"diff-content\" />";
 				$colspan = 2;
 				$multiColspan = 4;
 			} else {
@@ -1164,20 +1313,20 @@ class DifferenceEngine extends ContextSource {
 			}
 			if ( $otitle || $ntitle ) {
 				$header .= "
-				<tr style='vertical-align: top;' lang='{$userLang}'>
-				<td colspan='$colspan' class='diff-otitle'>{$otitle}</td>
-				<td colspan='$colspan' class='diff-ntitle'>{$ntitle}</td>
+				<tr class=\"diff-title\" lang=\"{$userLang}\">
+				<td colspan=\"$colspan\" class=\"diff-otitle\">{$otitle}</td>
+				<td colspan=\"$colspan\" class=\"diff-ntitle\">{$ntitle}</td>
 				</tr>";
 			}
 		}
 
 		if ( $multi != '' ) {
-			$header .= "<tr><td colspan='{$multiColspan}' style='text-align: center;' " .
-				"class='diff-multi' lang='{$userLang}'>{$multi}</td></tr>";
+			$header .= "<tr><td colspan=\"{$multiColspan}\" " .
+				"class=\"diff-multi\" lang=\"{$userLang}\">{$multi}</td></tr>";
 		}
 		if ( $notice != '' ) {
-			$header .= "<tr><td colspan='{$multiColspan}' style='text-align: center;' " .
-				"lang='{$userLang}'>{$notice}</td></tr>";
+			$header .= "<tr><td colspan=\"{$multiColspan}\" " .
+				"class=\"diff-notice\" lang=\"{$userLang}\">{$notice}</td></tr>";
 		}
 
 		return $header . $diff . "</table>";

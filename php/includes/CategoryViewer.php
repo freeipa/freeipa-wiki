@@ -108,7 +108,6 @@ class CategoryViewer extends ContextSource {
 	 * @return string HTML output
 	 */
 	public function getHTML() {
-
 		$this->showGallery = $this->getConfig()->get( 'CategoryMagicGallery' )
 			&& !$this->getOutput()->mNoGallery;
 
@@ -630,7 +629,7 @@ class CategoryViewer extends ContextSource {
 	 * @return string HTML
 	 */
 	private function pagingLinks( $first, $last, $type = '' ) {
-		$prevLink = $this->msg( 'prev-page' )->text();
+		$prevLink = $this->msg( 'prev-page' )->escaped();
 
 		$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
 		if ( $first != '' ) {
@@ -639,13 +638,13 @@ class CategoryViewer extends ContextSource {
 			unset( $prevQuery["{$type}from"] );
 			$prevLink = $linkRenderer->makeKnownLink(
 				$this->addFragmentToTitle( $this->title, $type ),
-				$prevLink,
+				new HtmlArmor( $prevLink ),
 				[],
 				$prevQuery
 			);
 		}
 
-		$nextLink = $this->msg( 'next-page' )->text();
+		$nextLink = $this->msg( 'next-page' )->escaped();
 
 		if ( $last != '' ) {
 			$lastQuery = $this->query;
@@ -653,7 +652,7 @@ class CategoryViewer extends ContextSource {
 			unset( $lastQuery["{$type}until"] );
 			$nextLink = $linkRenderer->makeKnownLink(
 				$this->addFragmentToTitle( $this->title, $type ),
-				$nextLink,
+				new HtmlArmor( $nextLink ),
 				[],
 				$lastQuery
 			);

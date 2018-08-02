@@ -26,7 +26,6 @@
  *
  * @file
  * @ingroup FileBackend
- * @author Aaron Schulz
  */
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerInterface;
@@ -176,7 +175,7 @@ abstract class FileBackend implements LoggerAwareInterface {
 			: new NullLockManager( [] );
 		$this->fileJournal = isset( $config['fileJournal'] )
 			? $config['fileJournal']
-			: FileJournal::factory( [ 'class' => 'NullFileJournal' ], $this->name );
+			: FileJournal::factory( [ 'class' => NullFileJournal::class ], $this->name );
 		$this->readOnly = isset( $config['readOnly'] )
 			? (string)$config['readOnly']
 			: '';
@@ -1592,13 +1591,13 @@ abstract class FileBackend implements LoggerAwareInterface {
 	 *   - StatusValue::newGood() if this method is called without parameters
 	 *   - StatusValue::newFatal() with all parameters to this method if passed in
 	 *
-	 * @param ... string
+	 * @param string $args,...
 	 * @return StatusValue
 	 */
 	final protected function newStatus() {
 		$args = func_get_args();
 		if ( count( $args ) ) {
-			$sv = call_user_func_array( [ 'StatusValue', 'newFatal' ], $args );
+			$sv = call_user_func_array( [ StatusValue::class, 'newFatal' ], $args );
 		} else {
 			$sv = StatusValue::newGood();
 		}

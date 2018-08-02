@@ -27,7 +27,6 @@ use MediaWiki\Logger\LoggerFactory;
  * Class to handle file lock manager registration
  *
  * @ingroup LockManager
- * @author Aaron Schulz
  * @since 1.19
  */
 class LockManagerGroup {
@@ -117,7 +116,7 @@ class LockManagerGroup {
 		if ( !isset( $this->managers[$name]['instance'] ) ) {
 			$class = $this->managers[$name]['class'];
 			$config = $this->managers[$name]['config'];
-			if ( $class === 'DBLockManager' ) {
+			if ( $class === DBLockManager::class ) {
 				$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
 				$lb = $lbFactory->newMainLB( $config['domain'] );
 				$dbw = $lb->getLazyConnectionRef( DB_MASTER, [], $config['domain'] );

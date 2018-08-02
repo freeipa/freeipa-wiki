@@ -39,9 +39,8 @@
  *
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class Preprocessor_Hash extends Preprocessor {
-	// @codingStandardsIgnoreEnd
 
 	/**
 	 * @var Parser
@@ -155,8 +154,7 @@ class Preprocessor_Hash extends Preprocessor {
 
 		$searchBase = "[{<\n";
 		if ( !$wgDisableLangConversion ) {
-			// FIXME: disabled due to T153761
-			// $searchBase .= '-';
+			$searchBase .= '-';
 		}
 
 		// For fast reverse searches
@@ -264,11 +262,15 @@ class Preprocessor_Hash extends Preprocessor {
 					} elseif ( isset( $this->rules[$curChar] ) ) {
 						$found = 'open';
 						$rule = $this->rules[$curChar];
-					} elseif ( $curChar == '-' ) {
-						$found = 'dash';
 					} else {
-						# Some versions of PHP have a strcspn which stops on null characters
-						# Ignore and continue
+						# Some versions of PHP have a strcspn which stops on
+						# null characters; ignore these and continue.
+						# We also may get '-' and '}' characters here which
+						# don't match -{ or $currentClosing.  Add these to
+						# output and continue.
+						if ( $curChar == '-' || $curChar == '}' ) {
+							self::addLiteral( $accum, $curChar );
+						}
 						++$i;
 						continue;
 					}
@@ -294,7 +296,6 @@ class Preprocessor_Hash extends Preprocessor {
 				}
 				// Handle comments
 				if ( isset( $matches[2] ) && $matches[2] == '!--' ) {
-
 					// To avoid leaving blank lines, when a sequence of
 					// space-separated comments is both preceded and followed by
 					// a newline (ignoring spaces), then
@@ -488,7 +489,16 @@ class Preprocessor_Hash extends Preprocessor {
 						'count' => $count ];
 					$stack->push( $piece );
 					$accum =& $stack->getAccum();
-					extract( $stack->getFlags() );
+					$stackFlags = $stack->getFlags();
+					if ( isset( $stackFlags['findEquals'] ) ) {
+						$findEquals = $stackFlags['findEquals'];
+					}
+					if ( isset( $stackFlags['findPipe'] ) ) {
+						$findPipe = $stackFlags['findPipe'];
+					}
+					if ( isset( $stackFlags['inHeading'] ) ) {
+						$inHeading = $stackFlags['inHeading'];
+					}
 					$i += $count;
 				}
 			} elseif ( $found == 'line-end' ) {
@@ -545,7 +555,16 @@ class Preprocessor_Hash extends Preprocessor {
 				// Unwind the stack
 				$stack->pop();
 				$accum =& $stack->getAccum();
-				extract( $stack->getFlags() );
+				$stackFlags = $stack->getFlags();
+				if ( isset( $stackFlags['findEquals'] ) ) {
+					$findEquals = $stackFlags['findEquals'];
+				}
+				if ( isset( $stackFlags['findPipe'] ) ) {
+					$findPipe = $stackFlags['findPipe'];
+				}
+				if ( isset( $stackFlags['inHeading'] ) ) {
+					$inHeading = $stackFlags['inHeading'];
+				}
 
 				// Append the result to the enclosing accumulator
 				array_splice( $accum, count( $accum ), 0, $element );
@@ -558,7 +577,22 @@ class Preprocessor_Hash extends Preprocessor {
 			} elseif ( $found == 'open' ) {
 				# count opening brace characters
 				$curLen = strlen( $curChar );
-				$count = ( $curLen > 1 ) ? 1 : strspn( $text, $curChar, $i );
+				$count = ( $curLen > 1 ) ?
+					# allow the final character to repeat
+					strspn( $text, $curChar[$curLen - 1], $i + 1 ) + 1 :
+					strspn( $text, $curChar, $i );
+
+				$savedPrefix = '';
+				$lineStart = ( $i > 0 && $text[$i - 1] == "\n" );
+
+				if ( $curChar === "-{" && $count > $curLen ) {
+					// -{ => {{ transition because rightmost wins
+					$savedPrefix = '-';
+					$i++;
+					$curChar = '{';
+					$count--;
+					$rule = $this->rules[$curChar];
+				}
 
 				# we need to add to stack only if opening brace count is enough for one of the rules
 				if ( $count >= $rule['min'] ) {
@@ -566,24 +600,38 @@ class Preprocessor_Hash extends Preprocessor {
 					$piece = [
 						'open' => $curChar,
 						'close' => $rule['end'],
+						'savedPrefix' => $savedPrefix,
 						'count' => $count,
-						'lineStart' => ( $i > 0 && $text[$i - 1] == "\n" ),
+						'lineStart' => $lineStart,
 					];
 
 					$stack->push( $piece );
 					$accum =& $stack->getAccum();
-					extract( $stack->getFlags() );
+					$stackFlags = $stack->getFlags();
+					if ( isset( $stackFlags['findEquals'] ) ) {
+						$findEquals = $stackFlags['findEquals'];
+					}
+					if ( isset( $stackFlags['findPipe'] ) ) {
+						$findPipe = $stackFlags['findPipe'];
+					}
+					if ( isset( $stackFlags['inHeading'] ) ) {
+						$inHeading = $stackFlags['inHeading'];
+					}
 				} else {
 					# Add literal brace(s)
-					self::addLiteral( $accum, str_repeat( $curChar, $count ) );
+					self::addLiteral( $accum, $savedPrefix . str_repeat( $curChar, $count ) );
 				}
-				$i += $curLen * $count;
+				$i += $count;
 			} elseif ( $found == 'close' ) {
 				$piece = $stack->top;
 				# lets check if there are enough characters for closing brace
 				$maxCount = $piece->count;
+				if ( $piece->close === '}-' && $curChar === '}' ) {
+					$maxCount--; # don't try to match closing '-' as a '}'
+				}
 				$curLen = strlen( $curChar );
-				$count = ( $curLen > 1 ) ? 1 : strspn( $text, $curChar, $i, $maxCount );
+				$count = ( $curLen > 1 ) ? $curLen :
+					strspn( $text, $curChar, $i, $maxCount );
 
 				# check for maximum matching characters (if there are 5 closing
 				# characters, we will probably need only 3 - depending on the rules)
@@ -605,15 +653,17 @@ class Preprocessor_Hash extends Preprocessor {
 				if ( $matchingCount <= 0 ) {
 					# No matching element found in callback array
 					# Output a literal closing brace and continue
-					self::addLiteral( $accum, str_repeat( $curChar, $count ) );
-					$i += $curLen * $count;
+					$endText = substr( $text, $i, $count );
+					self::addLiteral( $accum, $endText );
+					$i += $count;
 					continue;
 				}
 				$name = $rule['names'][$matchingCount];
 				if ( $name === null ) {
 					// No element, just literal text
+					$endText = substr( $text, $i, $matchingCount );
 					$element = $piece->breakSyntax( $matchingCount );
-					self::addLiteral( $element, str_repeat( $rule['end'], $matchingCount ) );
+					self::addLiteral( $element, $endText );
 				} else {
 					# Create XML element
 					$parts = $piece->parts;
@@ -624,7 +674,9 @@ class Preprocessor_Hash extends Preprocessor {
 
 					# The invocation is at the start of the line if lineStart is set in
 					# the stack, and all opening brackets are used up.
-					if ( $maxCount == $matchingCount && !empty( $piece->lineStart ) ) {
+					if ( $maxCount == $matchingCount &&
+							!empty( $piece->lineStart ) &&
+							strlen( $piece->savedPrefix ) == 0 ) {
 						$children[] = [ '@lineStart', [ 1 ] ];
 					}
 					$titleNode = [ 'title', $titleAccum ];
@@ -648,7 +700,7 @@ class Preprocessor_Hash extends Preprocessor {
 				}
 
 				# Advance input pointer
-				$i += $curLen * $matchingCount;
+				$i += $matchingCount;
 
 				# Unwind the stack
 				$stack->pop();
@@ -663,12 +715,35 @@ class Preprocessor_Hash extends Preprocessor {
 					if ( $piece->count >= $min ) {
 						$stack->push( $piece );
 						$accum =& $stack->getAccum();
+					} elseif ( $piece->count == 1 && $piece->open === '{' && $piece->savedPrefix === '-' ) {
+						$piece->savedPrefix = '';
+						$piece->open = '-{';
+						$piece->count = 2;
+						$piece->close = $this->rules[$piece->open]['end'];
+						$stack->push( $piece );
+						$accum =& $stack->getAccum();
 					} else {
-						self::addLiteral( $accum, str_repeat( $piece->open, $piece->count ) );
+						$s = substr( $piece->open, 0, -1 );
+						$s .= str_repeat(
+							substr( $piece->open, -1 ),
+							$piece->count - strlen( $s )
+						);
+						self::addLiteral( $accum, $piece->savedPrefix . $s );
 					}
+				} elseif ( $piece->savedPrefix !== '' ) {
+					self::addLiteral( $accum, $piece->savedPrefix );
 				}
 
-				extract( $stack->getFlags() );
+				$stackFlags = $stack->getFlags();
+				if ( isset( $stackFlags['findEquals'] ) ) {
+					$findEquals = $stackFlags['findEquals'];
+				}
+				if ( isset( $stackFlags['findPipe'] ) ) {
+					$findPipe = $stackFlags['findPipe'];
+				}
+				if ( isset( $stackFlags['inHeading'] ) ) {
+					$inHeading = $stackFlags['inHeading'];
+				}
 
 				# Add XML element to the enclosing accumulator
 				array_splice( $accum, count( $accum ), 0, $element );
@@ -681,9 +756,6 @@ class Preprocessor_Hash extends Preprocessor {
 				$findEquals = false; // shortcut for getFlags()
 				$accum[] = [ 'equals', [ '=' ] ];
 				$stack->getCurrentPart()->eqpos = count( $accum ) - 1;
-				++$i;
-			} elseif ( $found == 'dash' ) {
-				self::addLiteral( $accum, '-' );
 				++$i;
 			}
 		}
@@ -726,12 +798,11 @@ class Preprocessor_Hash extends Preprocessor {
  * Stack class to help Preprocessor::preprocessToObj()
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPDStack_Hash extends PPDStack {
-	// @codingStandardsIgnoreEnd
 
 	public function __construct() {
-		$this->elementClass = 'PPDStackElement_Hash';
+		$this->elementClass = PPDStackElement_Hash::class;
 		parent::__construct();
 		$this->rootAccum = [];
 	}
@@ -740,12 +811,11 @@ class PPDStack_Hash extends PPDStack {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPDStackElement_Hash extends PPDStackElement {
-	// @codingStandardsIgnoreEnd
 
 	public function __construct( $data = [] ) {
-		$this->partClass = 'PPDPart_Hash';
+		$this->partClass = PPDPart_Hash::class;
 		parent::__construct( $data );
 	}
 
@@ -757,12 +827,17 @@ class PPDStackElement_Hash extends PPDStackElement {
 	 */
 	public function breakSyntax( $openingCount = false ) {
 		if ( $this->open == "\n" ) {
-			$accum = $this->parts[0]->out;
+			$accum = array_merge( [ $this->savedPrefix ], $this->parts[0]->out );
 		} else {
 			if ( $openingCount === false ) {
 				$openingCount = $this->count;
 			}
-			$accum = [ str_repeat( $this->open, $openingCount ) ];
+			$s = substr( $this->open, 0, -1 );
+			$s .= str_repeat(
+				substr( $this->open, -1 ),
+				$openingCount - strlen( $s )
+			);
+			$accum = [ $this->savedPrefix . $s ];
 			$lastIndex = 0;
 			$first = true;
 			foreach ( $this->parts as $part ) {
@@ -789,9 +864,8 @@ class PPDStackElement_Hash extends PPDStackElement {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPDPart_Hash extends PPDPart {
-	// @codingStandardsIgnoreEnd
 
 	public function __construct( $out = '' ) {
 		if ( $out !== '' ) {
@@ -807,9 +881,8 @@ class PPDPart_Hash extends PPDPart {
  * An expansion frame, used as a context to expand the result of preprocessToObj()
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPFrame_Hash implements PPFrame {
-	// @codingStandardsIgnoreEnd
 
 	/**
 	 * @var Parser
@@ -1407,9 +1480,8 @@ class PPFrame_Hash implements PPFrame {
  * Expansion frame with template arguments
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPTemplateFrame_Hash extends PPFrame_Hash {
-	// @codingStandardsIgnoreEnd
 
 	public $numberedArgs, $namedArgs, $parent;
 	public $numberedExpansionCache, $namedExpansionCache;
@@ -1590,9 +1662,8 @@ class PPTemplateFrame_Hash extends PPFrame_Hash {
  * Expansion frame with custom arguments
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPCustomFrame_Hash extends PPFrame_Hash {
-	// @codingStandardsIgnoreEnd
 
 	public $args;
 
@@ -1643,9 +1714,8 @@ class PPCustomFrame_Hash extends PPFrame_Hash {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPNode_Hash_Tree implements PPNode {
-	// @codingStandardsIgnoreEnd
 
 	public $name;
 
@@ -1683,7 +1753,7 @@ class PPNode_Hash_Tree implements PPNode {
 	 * store array can be accessed via getNextSibling().
 	 *
 	 * @param array $store
-	 * @param integer $index
+	 * @param int $index
 	 */
 	public function __construct( array $store, $index ) {
 		$this->store = $store;
@@ -1696,7 +1766,7 @@ class PPNode_Hash_Tree implements PPNode {
 	 * on what is at the relevant store index.
 	 *
 	 * @param array $store
-	 * @param integer $index
+	 * @param int $index
 	 * @return PPNode_Hash_Tree|PPNode_Hash_Attr|PPNode_Hash_Text
 	 */
 	public static function factory( array $store, $index ) {
@@ -1706,12 +1776,12 @@ class PPNode_Hash_Tree implements PPNode {
 
 		$descriptor = $store[$index];
 		if ( is_string( $descriptor ) ) {
-			$class = 'PPNode_Hash_Text';
+			$class = PPNode_Hash_Text::class;
 		} elseif ( is_array( $descriptor ) ) {
 			if ( $descriptor[self::NAME][0] === '@' ) {
-				$class = 'PPNode_Hash_Attr';
+				$class = PPNode_Hash_Attr::class;
 			} else {
-				$class = 'PPNode_Hash_Tree';
+				$class = self::class;
 			}
 		} else {
 			throw new MWException( __METHOD__.': invalid node descriptor' );
@@ -1755,7 +1825,7 @@ class PPNode_Hash_Tree implements PPNode {
 	 * return a temporary proxy object: different instances will be returned
 	 * if this is called more than once on the same node.
 	 *
-	 * @return PPNode_Hash_Tree|PPNode_Hash_Attr|PPNode_Hash_Text|boolean
+	 * @return PPNode_Hash_Tree|PPNode_Hash_Attr|PPNode_Hash_Text|bool
 	 */
 	public function getFirstChild() {
 		if ( !isset( $this->rawChildren[0] ) ) {
@@ -1770,7 +1840,7 @@ class PPNode_Hash_Tree implements PPNode {
 	 * return a temporary proxy object: different instances will be returned
 	 * if this is called more than once on the same node.
 	 *
-	 * @return PPNode_Hash_Tree|PPNode_Hash_Attr|PPNode_Hash_Text|boolean
+	 * @return PPNode_Hash_Tree|PPNode_Hash_Attr|PPNode_Hash_Text|bool
 	 */
 	public function getNextSibling() {
 		return self::factory( $this->store, $this->index + 1 );
@@ -1837,6 +1907,8 @@ class PPNode_Hash_Tree implements PPNode {
 
 	/**
 	 * Like splitArg() but for a raw child array. For internal use only.
+	 * @param array $children
+	 * @return array
 	 */
 	public static function splitRawArg( array $children ) {
 		$bits = [];
@@ -1878,6 +1950,8 @@ class PPNode_Hash_Tree implements PPNode {
 
 	/**
 	 * Like splitExt() but for a raw child array. For internal use only.
+	 * @param array $children
+	 * @return array
 	 */
 	public static function splitRawExt( array $children ) {
 		$bits = [];
@@ -1886,18 +1960,18 @@ class PPNode_Hash_Tree implements PPNode {
 				continue;
 			}
 			switch ( $child[self::NAME] ) {
-			case 'name':
-				$bits['name'] = new self( $children, $i );
-				break;
-			case 'attr':
-				$bits['attr'] = new self( $children, $i );
-				break;
-			case 'inner':
-				$bits['inner'] = new self( $children, $i );
-				break;
-			case 'close':
-				$bits['close'] = new self( $children, $i );
-				break;
+				case 'name':
+					$bits['name'] = new self( $children, $i );
+					break;
+				case 'attr':
+					$bits['attr'] = new self( $children, $i );
+					break;
+				case 'inner':
+					$bits['inner'] = new self( $children, $i );
+					break;
+				case 'close':
+					$bits['close'] = new self( $children, $i );
+					break;
 			}
 		}
 		if ( !isset( $bits['name'] ) ) {
@@ -1921,6 +1995,8 @@ class PPNode_Hash_Tree implements PPNode {
 
 	/**
 	 * Like splitHeading() but for a raw child array. For internal use only.
+	 * @param array $children
+	 * @return array
 	 */
 	public static function splitRawHeading( array $children ) {
 		$bits = [];
@@ -1952,6 +2028,8 @@ class PPNode_Hash_Tree implements PPNode {
 
 	/**
 	 * Like splitTemplate() but for a raw child array. For internal use only.
+	 * @param array $children
+	 * @return array
 	 */
 	public static function splitRawTemplate( array $children ) {
 		$parts = [];
@@ -1961,15 +2039,15 @@ class PPNode_Hash_Tree implements PPNode {
 				continue;
 			}
 			switch ( $child[self::NAME] ) {
-			case 'title':
-				$bits['title'] = new self( $children, $i );
-				break;
-			case 'part':
-				$parts[] = new self( $children, $i );
-				break;
-			case '@lineStart':
-				$bits['lineStart'] = '1';
-				break;
+				case 'title':
+					$bits['title'] = new self( $children, $i );
+					break;
+				case 'part':
+					$parts[] = new self( $children, $i );
+					break;
+				case '@lineStart':
+					$bits['lineStart'] = '1';
+					break;
 			}
 		}
 		if ( !isset( $bits['title'] ) ) {
@@ -1983,9 +2061,8 @@ class PPNode_Hash_Tree implements PPNode {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPNode_Hash_Text implements PPNode {
-	// @codingStandardsIgnoreEnd
 
 	public $value;
 	private $store, $index;
@@ -1995,7 +2072,7 @@ class PPNode_Hash_Text implements PPNode {
 	 * store array can be accessed via getNextSibling().
 	 *
 	 * @param array $store
-	 * @param integer $index
+	 * @param int $index
 	 */
 	public function __construct( array $store, $index ) {
 		$this->value = $store[$index];
@@ -2054,9 +2131,8 @@ class PPNode_Hash_Text implements PPNode {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPNode_Hash_Array implements PPNode {
-	// @codingStandardsIgnoreEnd
 
 	public $value;
 
@@ -2112,9 +2188,8 @@ class PPNode_Hash_Array implements PPNode {
 /**
  * @ingroup Parser
  */
-// @codingStandardsIgnoreStart Squiz.Classes.ValidClassName.NotCamelCaps
+// phpcs:ignore Squiz.Classes.ValidClassName.NotCamelCaps
 class PPNode_Hash_Attr implements PPNode {
-	// @codingStandardsIgnoreEnd
 
 	public $name, $value;
 	private $store, $index;
@@ -2124,7 +2199,7 @@ class PPNode_Hash_Attr implements PPNode {
 	 * store array can be accessed via getNextSibling().
 	 *
 	 * @param array $store
-	 * @param integer $index
+	 * @param int $index
 	 */
 	public function __construct( array $store, $index ) {
 		$descriptor = $store[$index];

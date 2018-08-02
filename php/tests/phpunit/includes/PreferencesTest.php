@@ -44,6 +44,7 @@ class PreferencesTest extends MediaWikiTestCase {
 	/**
 	 * Placeholder to verify T36302
 	 * @covers Preferences::profilePreferences
+	 * @deprecated replaced by DefaultPreferencesFactoryTest::testEmailAuthentication()
 	 */
 	public function testEmailAuthenticationFieldWhenUserHasNoEmail() {
 		$prefs = $this->prefsFor( 'noemail' );
@@ -56,6 +57,7 @@ class PreferencesTest extends MediaWikiTestCase {
 	/**
 	 * Placeholder to verify T36302
 	 * @covers Preferences::profilePreferences
+	 * @deprecated replaced by DefaultPreferencesFactoryTest::testEmailAuthentication()
 	 */
 	public function testEmailAuthenticationFieldWhenUserEmailNotAuthenticated() {
 		$prefs = $this->prefsFor( 'notauth' );
@@ -68,6 +70,7 @@ class PreferencesTest extends MediaWikiTestCase {
 	/**
 	 * Placeholder to verify T36302
 	 * @covers Preferences::profilePreferences
+	 * @deprecated replaced by DefaultPreferencesFactoryTest::testEmailAuthentication()
 	 */
 	public function testEmailAuthenticationFieldWhenUserEmailIsAuthenticated() {
 		$prefs = $this->prefsFor( 'auth' );
@@ -79,13 +82,9 @@ class PreferencesTest extends MediaWikiTestCase {
 
 	/** Helper */
 	protected function prefsFor( $user_key ) {
-		$preferences = [];
-		Preferences::profilePreferences(
+		return Preferences::getPreferences(
 			$this->prefUsers[$user_key],
-			$this->context,
-			$preferences
+			$this->context
 		);
-
-		return $preferences;
 	}
 }

@@ -29,8 +29,16 @@ class EditPageTest extends MediaWikiLangTestCase {
 		$wgNamespaceContentModels[12312] = "testing";
 		$wgContentHandlers["testing"] = 'DummyContentHandlerForTesting';
 
-		MWNamespace::getCanonicalNamespaces( true ); # reset namespace cache
+		MWNamespace::clearCaches();
 		$wgContLang->resetNamespaces(); # reset namespace cache
+	}
+
+	protected function tearDown() {
+		global $wgContLang;
+
+		MWNamespace::clearCaches();
+		$wgContLang->resetNamespaces(); # reset namespace cache
+		parent::tearDown();
 	}
 
 	/**
@@ -163,6 +171,10 @@ class EditPageTest extends MediaWikiLangTestCase {
 
 		if ( !isset( $edit['wpStarttime'] ) ) {
 			$edit['wpStarttime'] = wfTimestampNow();
+		}
+
+		if ( !isset( $edit['wpUnicodeCheck'] ) ) {
+			$edit['wpUnicodeCheck'] = EditPage::UNICODE_CHECK;
 		}
 
 		$req = new FauxRequest( $edit, true ); // session ??
@@ -697,14 +709,15 @@ hello
 			'wpTextbox1' => serialize( 'non-text content' ),
 			'wpEditToken' => $user->getEditToken(),
 			'wpEdittime' => '',
-			'wpStarttime' => wfTimestampNow()
+			'wpStarttime' => wfTimestampNow(),
+			'wpUnicodeCheck' => EditPage::UNICODE_CHECK,
 		];
 
 		$req = new FauxRequest( $edit, true );
 		$ep->importFormData( $req );
 
 		$this->setExpectedException(
-			'MWException',
+			MWException::class,
 			'This content model is not supported: testing'
 		);
 

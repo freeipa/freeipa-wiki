@@ -43,8 +43,7 @@ use UDPTransport;
  *
  * @see \MediaWiki\Logger\LoggerFactory
  * @since 1.25
- * @author Bryan Davis <bd808@wikimedia.org>
- * @copyright © 2014 Bryan Davis and Wikimedia Foundation.
+ * @copyright © 2014 Wikimedia Foundation and contributors
  */
 class LegacyLogger extends AbstractLogger {
 
@@ -455,20 +454,20 @@ class LegacyLogger extends AbstractLogger {
 	}
 
 	/**
-	* Log to a file without getting "file size exceeded" signals.
-	*
-	* Can also log to UDP with the syntax udp://host:port/prefix. This will send
-	* lines to the specified port, prefixed by the specified prefix and a space.
-	*
-	* @param string $text
-	* @param string $file Filename
-	*/
+	 * Log to a file without getting "file size exceeded" signals.
+	 *
+	 * Can also log to UDP with the syntax udp://host:port/prefix. This will send
+	 * lines to the specified port, prefixed by the specified prefix and a space.
+	 *
+	 * @param string $text
+	 * @param string $file Filename
+	 */
 	public static function emit( $text, $file ) {
 		if ( substr( $file, 0, 4 ) == 'udp:' ) {
 			$transport = UDPTransport::newFromString( $file );
 			$transport->emit( $text );
 		} else {
-			\MediaWiki\suppressWarnings();
+			\Wikimedia\suppressWarnings();
 			$exists = file_exists( $file );
 			$size = $exists ? filesize( $file ) : false;
 			if ( !$exists ||
@@ -476,7 +475,7 @@ class LegacyLogger extends AbstractLogger {
 			) {
 				file_put_contents( $file, $text, FILE_APPEND );
 			}
-			\MediaWiki\restoreWarnings();
+			\Wikimedia\restoreWarnings();
 		}
 	}
 

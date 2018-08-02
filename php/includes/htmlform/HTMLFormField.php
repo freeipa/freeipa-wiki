@@ -357,7 +357,7 @@ abstract class HTMLFormField {
 	 * (wpFormIdentifier).
 	 *
 	 * @param WebRequest $request
-	 * @return boolean
+	 * @return bool
 	 */
 	protected function isSubmitAttempt( WebRequest $request ) {
 		return $request->getCheck( 'wpEditToken' ) || $request->getCheck( 'wpFormIdentifier' );
@@ -416,8 +416,8 @@ abstract class HTMLFormField {
 			$this->mDir = $params['dir'];
 		}
 
-		$validName = Sanitizer::escapeId( $this->mName );
-		$validName = str_replace( [ '.5B', '.5D' ], [ '[', ']' ], $validName );
+		$validName = urlencode( $this->mName );
+		$validName = str_replace( [ '%5B', '%5D' ], [ '[', ']' ], $validName );
 		if ( $this->mName != $validName && !isset( $params['nodata'] ) ) {
 			throw new MWException( "Invalid name '{$this->mName}' passed to " . __METHOD__ );
 		}
@@ -430,7 +430,7 @@ abstract class HTMLFormField {
 
 		if ( isset( $params['id'] ) ) {
 			$id = $params['id'];
-			$validId = Sanitizer::escapeId( $id );
+			$validId = urlencode( $id );
 
 			if ( $id != $validId ) {
 				throw new MWException( "Invalid id '$id' passed to " . __METHOD__ );
@@ -631,7 +631,7 @@ abstract class HTMLFormField {
 
 		// the element could specify, that the label doesn't need to be added
 		$label = $this->getLabel();
-		if ( $label ) {
+		if ( $label && $label !== '&#160;' ) {
 			$config['label'] = new OOUI\HtmlSnippet( $label );
 		}
 
@@ -660,6 +660,8 @@ abstract class HTMLFormField {
 
 	/**
 	 * Get a FieldLayout (or subclass thereof) to wrap this field in when using OOUI output.
+	 * @param string $inputField
+	 * @param array $config
 	 * @return OOUI\FieldLayout|OOUI\ActionFieldLayout
 	 */
 	protected function getFieldLayoutOOUI( $inputField, $config ) {
@@ -671,7 +673,7 @@ abstract class HTMLFormField {
 	}
 
 	/**
-	 * Whether the field should be automatically infused. Note that all OOjs UI HTMLForm fields are
+	 * Whether the field should be automatically infused. Note that all OOUI HTMLForm fields are
 	 * infusable (you can call OO.ui.infuse() on them), but not all are infused by default, since
 	 * there is no benefit in doing it e.g. for buttons and it's a small performance hit on page load.
 	 *
@@ -684,7 +686,7 @@ abstract class HTMLFormField {
 
 	/**
 	 * Get the list of extra ResourceLoader modules which must be loaded client-side before it's
-	 * possible to infuse this field's OOjs UI widget.
+	 * possible to infuse this field's OOUI widget.
 	 *
 	 * @return string[]
 	 */
@@ -976,7 +978,7 @@ abstract class HTMLFormField {
 	}
 
 	/**
-	 * Returns the attributes required for the tooltip and accesskey.
+	 * Returns the attributes required for the tooltip and accesskey, for Html::element() etc.
 	 *
 	 * @return array Attributes
 	 */
@@ -986,6 +988,22 @@ abstract class HTMLFormField {
 		}
 
 		return Linker::tooltipAndAccesskeyAttribs( $this->mParams['tooltip'] );
+	}
+
+	/**
+	 * Returns the attributes required for the tooltip and accesskey, for OOUI widgets' config.
+	 *
+	 * @return array Attributes
+	 */
+	public function getTooltipAndAccessKeyOOUI() {
+		if ( empty( $this->mParams['tooltip'] ) ) {
+			return [];
+		}
+
+		return [
+			'title' => Linker::titleAttrib( $this->mParams['tooltip'] ),
+			'accessKey' => Linker::accesskey( $this->mParams['tooltip'] ),
+		];
 	}
 
 	/**
@@ -1058,33 +1076,8 @@ abstract class HTMLFormField {
 				$this->mOptionsLabelsNotFromMessage = true;
 				$this->mOptions = self::forceToStringRecursive( $this->mParams['options'] );
 			} elseif ( array_key_exists( 'options-message', $this->mParams ) ) {
-				/** @todo This is copied from Xml::listDropDown(), deprecate/avoid duplication? */
 				$message = $this->getMessage( $this->mParams['options-message'] )->inContentLanguage()->plain();
-
-				$optgroup = false;
-				$this->mOptions = [];
-				foreach ( explode( "\n", $message ) as $option ) {
-					$value = trim( $option );
-					if ( $value == '' ) {
-						continue;
-					} elseif ( substr( $value, 0, 1 ) == '*' && substr( $value, 1, 1 ) != '*' ) {
-						# A new group is starting...
-						$value = trim( substr( $value, 1 ) );
-						$optgroup = $value;
-					} elseif ( substr( $value, 0, 2 ) == '**' ) {
-						# groupmember
-						$opt = trim( substr( $value, 2 ) );
-						if ( $optgroup === false ) {
-							$this->mOptions[$opt] = $opt;
-						} else {
-							$this->mOptions[$optgroup][$opt] = $opt;
-						}
-					} else {
-						# groupless reason list
-						$optgroup = false;
-						$this->mOptions[$option] = $option;
-					}
-				}
+				$this->mOptions = Xml::listDropDownOptions( $message );
 			} else {
 				$this->mOptions = null;
 			}
@@ -1104,16 +1097,7 @@ abstract class HTMLFormField {
 			return null;
 		}
 
-		$options = [];
-
-		foreach ( $oldoptions as $text => $data ) {
-			$options[] = [
-				'data' => (string)$data,
-				'label' => (string)$text,
-			];
-		}
-
-		return $options;
+		return Xml::listDropDownOptionsOoui( $oldoptions );
 	}
 
 	/**
@@ -1202,7 +1186,7 @@ abstract class HTMLFormField {
 	 * Whether this field requires the user agent to have JavaScript enabled for the client-side HTML5
 	 * form validation to work correctly.
 	 *
-	 * @return boolean
+	 * @return bool
 	 * @since 1.29
 	 */
 	public function needsJSForHtml5FormValidation() {

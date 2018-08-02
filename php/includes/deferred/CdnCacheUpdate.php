@@ -18,7 +18,6 @@
  * http://www.gnu.org/copyleft/gpl.html
  *
  * @file
- * @ingroup Cache
  */
 
 use Wikimedia\Assert\Assert;
@@ -49,11 +48,12 @@ class CdnCacheUpdate implements DeferrableUpdate, MergeableUpdate {
 	/**
 	 * Create an update object from an array of Title objects, or a TitleArray object
 	 *
-	 * @param Traversable|array $titles
+	 * @param Traversable|Title[] $titles
 	 * @param string[] $urlArr
 	 * @return CdnCacheUpdate
 	 */
 	public static function newFromTitles( $titles, $urlArr = [] ) {
+		( new LinkBatch( $titles ) )->execute();
 		/** @var Title $title */
 		foreach ( $titles as $title ) {
 			$urlArr = array_merge( $urlArr, $title->getCdnUrls() );

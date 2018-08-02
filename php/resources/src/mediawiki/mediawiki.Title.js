@@ -1,10 +1,8 @@
 /*!
  * @author Neil Kandalgaonkar, 2010
- * @author Timo Tijhof, 2011-2013
+ * @author Timo Tijhof
  * @since 1.18
  */
-
-/* eslint-disable no-use-before-define */
 
 ( function ( mw, $ ) {
 	/**
@@ -29,28 +27,13 @@
 	 *     mw.Title.makeTitle( NS_TEMPLATE, 'Template:Foo' ).getPrefixedText();   // => 'Template:Template:Foo'
 	 *
 	 * @class mw.Title
-	 * @constructor
-	 * @param {string} title Title of the page. If no second argument given,
-	 *  this will be searched for a namespace
-	 * @param {number} [namespace=NS_MAIN] If given, will used as default namespace for the given title
-	 * @throws {Error} When the title is invalid
 	 */
-	function Title( title, namespace ) {
-		var parsed = parse( title, namespace );
-		if ( !parsed ) {
-			throw new Error( 'Unable to parse title' );
-		}
-
-		this.namespace = parsed.namespace;
-		this.title = parsed.title;
-		this.ext = parsed.ext;
-		this.fragment = parsed.fragment;
-	}
 
 	/* Private members */
 
-	// eslint-disable-next-line vars-on-top
 	var
+		mwString = require( 'mediawiki.String' ),
+
 		namespaceIds = mw.config.get( 'wgNamespaceIds' ),
 
 		/**
@@ -208,13 +191,13 @@
 			},
 			// brackets, greater than
 			{
-				pattern: /[\]\}>]/g,
+				pattern: /[}\]>]/g,
 				replace: ')',
 				generalRule: true
 			},
 			// brackets, lower than
 			{
-				pattern: /[\[\{<]/g,
+				pattern: /[{[<]/g,
 				replace: '(',
 				generalRule: true
 			},
@@ -339,7 +322,7 @@
 			// Except for special pages, e.g. [[Special:Block/Long name]]
 			// Note: The PHP implementation also asserts that even in NS_SPECIAL, the title should
 			// be less than 512 bytes.
-			if ( namespace !== NS_SPECIAL && $.byteLength( title ) > TITLE_MAX_BYTES ) {
+			if ( namespace !== NS_SPECIAL && mwString.byteLength( title ) > TITLE_MAX_BYTES ) {
 				return false;
 			}
 
@@ -426,21 +409,7 @@
 		 * @return {string}
 		 */
 		trimToByteLength = function ( s, length ) {
-			var byteLength, chopOffChars, chopOffBytes;
-
-			// bytelength is always greater or equal to the length in characters
-			s = s.substr( 0, length );
-			while ( ( byteLength = $.byteLength( s ) ) > length ) {
-				// Calculate how many characters can be safely removed
-				// First, we need to know how many bytes the string exceeds the threshold
-				chopOffBytes = byteLength - length;
-				// A character in UTF-8 is at most 4 bytes
-				// One character must be removed in any case because the
-				// string is too long
-				chopOffChars = Math.max( 1, Math.floor( chopOffBytes / 4 ) );
-				s = s.substr( 0, s.length - chopOffChars );
-			}
-			return s;
+			return mwString.trimByteLength( '', s, length ).newVal;
 		},
 
 		/**
@@ -456,19 +425,26 @@
 		trimFileNameToByteLength = function ( name, extension ) {
 			// There is a special byte limit for file names and ... remember the dot
 			return trimToByteLength( name, FILENAME_MAX_BYTES - extension.length - 1 ) + '.' + extension;
-		},
+		};
 
-		// Polyfill for ES5 Object.create
-		createObject = Object.create || ( function () {
-			return function ( o ) {
-				function Title() {}
-				if ( o !== Object( o ) ) {
-					throw new Error( 'Cannot inherit from a non-object' );
-				}
-				Title.prototype = o;
-				return new Title();
-			};
-		}() );
+	/**
+	 * @method constructor
+	 * @param {string} title Title of the page. If no second argument given,
+	 *  this will be searched for a namespace
+	 * @param {number} [namespace=NS_MAIN] If given, will used as default namespace for the given title
+	 * @throws {Error} When the title is invalid
+	 */
+	function Title( title, namespace ) {
+		var parsed = parse( title, namespace );
+		if ( !parsed ) {
+			throw new Error( 'Unable to parse title' );
+		}
+
+		this.namespace = parsed.namespace;
+		this.title = parsed.title;
+		this.ext = parsed.ext;
+		this.fragment = parsed.fragment;
+	}
 
 	/* Static members */
 
@@ -490,7 +466,7 @@
 			return null;
 		}
 
-		t = createObject( Title.prototype );
+		t = Object.create( Title.prototype );
 		t.namespace = parsed.namespace;
 		t.title = parsed.title;
 		t.ext = parsed.ext;
@@ -549,7 +525,7 @@
 		namespace = defaultNamespace === undefined ? NS_MAIN : defaultNamespace;
 
 		// Normalise additional whitespace
-		title = $.trim( title.replace( /\s/g, ' ' ) );
+		title = title.replace( /\s/g, ' ' ).trim();
 
 		// Process initial colon
 		if ( title !== '' && title[ 0 ] === ':' ) {
@@ -591,7 +567,7 @@
 				ext = parts.pop();
 
 				// Remove whitespace of the name part (that W/O extension)
-				title = $.trim( parts.join( '.' ) );
+				title = parts.join( '.' ).trim();
 
 				// Cut, if too long and append file extension
 				title = trimFileNameToByteLength( title, ext );
@@ -599,7 +575,7 @@
 			} else {
 
 				// Missing file extension
-				title = $.trim( parts.join( '.' ) );
+				title = parts.join( '.' ).trim();
 
 				// Name has no file extension and a fallback wasn't provided either
 				return null;
@@ -616,7 +592,7 @@
 		}
 
 		// Any remaining initial :s are illegal.
-		title = title.replace( /^\:+/, '' );
+		title = title.replace( /^:+/, '' );
 
 		return Title.newFromText( title, namespace );
 	};
@@ -654,16 +630,16 @@
 			thumbPhpRegex = /thumb\.php/,
 			regexes = [
 				// Thumbnails
-				/\/[a-f0-9]\/[a-f0-9]{2}\/([^\s\/]+)\/[^\s\/]+-[^\s\/]*$/,
+				/\/[a-f0-9]\/[a-f0-9]{2}\/([^\s/]+)\/[^\s/]+-[^\s/]*$/,
 
 				// Full size images
-				/\/[a-f0-9]\/[a-f0-9]{2}\/([^\s\/]+)$/,
+				/\/[a-f0-9]\/[a-f0-9]{2}\/([^\s/]+)$/,
 
 				// Thumbnails in non-hashed upload directories
-				/\/([^\s\/]+)\/[^\s\/]+-(?:\1|thumbnail)[^\s\/]*$/,
+				/\/([^\s/]+)\/[^\s/]+-(?:\1|thumbnail)[^\s/]*$/,
 
 				// Full-size images in non-hashed upload directories
-				/\/([^\s\/]+)$/
+				/\/([^\s/]+)$/
 			],
 
 			recount = regexes.length;
@@ -699,22 +675,21 @@
 	 */
 	Title.exists = function ( title ) {
 		var match,
-			type = $.type( title ),
 			obj = Title.exist.pages;
 
-		if ( type === 'string' ) {
+		if ( typeof title === 'string' ) {
 			match = obj[ title ];
-		} else if ( type === 'object' && title instanceof Title ) {
+		} else if ( title instanceof Title ) {
 			match = obj[ title.toString() ];
 		} else {
 			throw new Error( 'mw.Title.exists: title must be a string or an instance of Title' );
 		}
 
-		if ( typeof match === 'boolean' ) {
-			return match;
+		if ( typeof match !== 'boolean' ) {
+			return null;
 		}
 
-		return null;
+		return match;
 	};
 
 	/**

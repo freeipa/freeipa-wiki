@@ -1,10 +1,6 @@
 <?php
 
 /**
- *
- *
- * Created on Dec 29, 2015
- *
  * Copyright © 2015 Geoffrey Mon <geofbot@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -24,6 +20,7 @@
  *
  * @file
  */
+use MediaWiki\MediaWikiServices;
 use Wikimedia\Timestamp\TimestampException;
 use Wikimedia\Rdbms\IDatabase;
 
@@ -56,11 +53,10 @@ class MergeHistory {
 	/** @var MWTimestamp|bool Timestamp upto which history from the source will be merged */
 	protected $timestampLimit;
 
-	/** @var integer Number of revisions merged (for Special:MergeHistory success message) */
+	/** @var int Number of revisions merged (for Special:MergeHistory success message) */
 	protected $revisionsMerged;
 
 	/**
-	 * MergeHistory constructor.
 	 * @param Title $source Page from which history will be merged
 	 * @param Title $dest Page to which history will be merged
 	 * @param string|bool $timestamp Timestamp up to which history from the source will be merged
@@ -335,6 +331,10 @@ class MergeHistory {
 			$this->source->invalidateCache(); // update histories
 		}
 		$this->dest->invalidateCache(); // update histories
+
+		// Duplicate watchers of the old article to the new article on history merge
+		$store = MediaWikiServices::getInstance()->getWatchedItemStore();
+		$store->duplicateAllAssociatedEntries( $this->source, $this->dest );
 
 		// Update our logs
 		$logEntry = new ManualLogEntry( 'merge', 'merge' );

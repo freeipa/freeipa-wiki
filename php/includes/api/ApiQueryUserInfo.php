@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on July 30, 2007
- *
  * Copyright © 2007 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -182,17 +178,6 @@ class ApiQueryUserInfo extends ApiQueryBase {
 			$vals['options'][ApiResult::META_BC_BOOLS] = array_keys( $vals['options'] );
 		}
 
-		if ( isset( $this->prop['preferencestoken'] ) ) {
-			$p = $this->getModulePrefix();
-			$this->addDeprecation(
-				[
-					'apiwarn-deprecation-withreplacement',
-					"{$p}prop=preferencestoken",
-					'action=query&meta=tokens',
-				],
-				"meta=userinfo&{$p}prop=preferencestoken"
-			);
-		}
 		if ( isset( $this->prop['preferencestoken'] ) &&
 			!$this->lacksSameOriginSecurity() &&
 			$user->isAllowed( 'editmyoptions' )
@@ -320,7 +305,6 @@ class ApiQueryUserInfo extends ApiQueryBase {
 					'rights',
 					'changeablegroups',
 					'options',
-					'preferencestoken',
 					'editcount',
 					'ratelimits',
 					'email',
@@ -329,6 +313,7 @@ class ApiQueryUserInfo extends ApiQueryBase {
 					'registrationdate',
 					'unreadcount',
 					'centralids',
+					'preferencestoken',
 				],
 				ApiBase::PARAM_HELP_MSG_PER_VALUE => [
 					'unreadcount' => [
@@ -336,6 +321,13 @@ class ApiQueryUserInfo extends ApiQueryBase {
 						self::WL_UNREAD_LIMIT - 1,
 						self::WL_UNREAD_LIMIT . '+',
 					],
+				],
+				ApiBase::PARAM_DEPRECATED_VALUES => [
+					'preferencestoken' => [
+						'apiwarn-deprecation-withreplacement',
+						$this->getModulePrefix() . "prop=preferencestoken",
+						'action=query&meta=tokens',
+					]
 				],
 			],
 			'attachedwiki' => null,

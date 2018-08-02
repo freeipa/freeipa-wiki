@@ -163,7 +163,7 @@ class TitleTest extends MediaWikiTestCase {
 	 */
 	public function testSecureAndSplitValid( $text ) {
 		$this->secureAndSplitGlobals();
-		$this->assertInstanceOf( 'Title', Title::newFromText( $text ), "Valid: $text" );
+		$this->assertInstanceOf( Title::class, Title::newFromText( $text ), "Valid: $text" );
 	}
 
 	/**
@@ -282,7 +282,6 @@ class TitleTest extends MediaWikiTestCase {
 	/**
 	 * Auth-less test of Title::isValidMoveOperation
 	 *
-	 * @group Database
 	 * @param string $source
 	 * @param string $target
 	 * @param array|string|bool $expected Required error
@@ -435,7 +434,7 @@ class TitleTest extends MediaWikiTestCase {
 		$this->setContentLang( $contLang );
 
 		$title = Title::newFromText( $titleText );
-		$this->assertInstanceOf( 'Title', $title,
+		$this->assertInstanceOf( Title::class, $title,
 			"Test must be passed a valid title text, you gave '$titleText'"
 		);
 		$this->assertEquals( $expected,
@@ -553,6 +552,7 @@ class TitleTest extends MediaWikiTestCase {
 	}
 
 	/**
+	 * @covers Title::newFromTitleValue
 	 * @dataProvider provideNewFromTitleValue
 	 */
 	public function testNewFromTitleValue( TitleValue $value ) {
@@ -573,6 +573,7 @@ class TitleTest extends MediaWikiTestCase {
 	}
 
 	/**
+	 * @covers Title::getTitleValue
 	 * @dataProvider provideGetTitleValue
 	 */
 	public function testGetTitleValue( $text ) {
@@ -604,6 +605,7 @@ class TitleTest extends MediaWikiTestCase {
 	}
 
 	/**
+	 * @covers Title::getFragment
 	 * @dataProvider provideGetFragment
 	 *
 	 * @param string $full
@@ -634,6 +636,28 @@ class TitleTest extends MediaWikiTestCase {
 			[ 'Special:SomeNonexistentSpecialPage', false ],
 			[ 'MediaWiki:Parentheses', true ],
 			[ 'MediaWiki:Some nonexistent message', false ],
+		];
+	}
+
+	/**
+	 * @covers Title::isValid
+	 * @dataProvider provideIsValid
+	 * @param Title $title
+	 * @param bool $isValid
+	 */
+	public function testIsValid( Title $title, $isValid ) {
+		$this->assertEquals( $isValid, $title->isValid(), $title->getPrefixedText() );
+	}
+
+	public static function provideIsValid() {
+		return [
+			[ Title::makeTitle( NS_MAIN, '' ), false ],
+			[ Title::makeTitle( NS_MAIN, '<>' ), false ],
+			[ Title::makeTitle( NS_MAIN, '|' ), false ],
+			[ Title::makeTitle( NS_MAIN, '#' ), false ],
+			[ Title::makeTitle( NS_MAIN, 'Test' ), true ],
+			[ Title::makeTitle( -33, 'Test' ), false ],
+			[ Title::makeTitle( 77663399, 'Test' ), false ],
 		];
 	}
 
@@ -672,6 +696,99 @@ class TitleTest extends MediaWikiTestCase {
 			true,
 			$title->exists( Title::GAID_FOR_UPDATE ),
 			'exists() should re-query database when GAID_FOR_UPDATE is used'
+		);
+	}
+
+	public function provideCanHaveTalkPage() {
+		return [
+			'User page has talk page' => [
+				Title::makeTitle( NS_USER, 'Jane' ), true
+			],
+			'Talke page has talk page' => [
+				Title::makeTitle( NS_TALK, 'Foo' ), true
+			],
+			'Special page cannot have talk page' => [
+				Title::makeTitle( NS_SPECIAL, 'Thing' ), false
+			],
+			'Virtual namespace cannot have talk page' => [
+				Title::makeTitle( NS_MEDIA, 'Kitten.jpg' ), false
+			],
+		];
+	}
+
+	/**
+	 * @dataProvider provideCanHaveTalkPage
+	 * @covers Title::canHaveTalkPage
+	 *
+	 * @param Title $title
+	 * @param bool $expected
+	 */
+	public function testCanHaveTalkPage( Title $title, $expected ) {
+		$actual = $title->canHaveTalkPage();
+		$this->assertSame( $expected, $actual, $title->getPrefixedDBkey() );
+	}
+
+	/**
+	 * @dataProvider provideCanHaveTalkPage
+	 * @covers Title::canTalk
+	 *
+	 * @param Title $title
+	 * @param bool $expected
+	 */
+	public function testCanTalk( Title $title, $expected ) {
+		$actual = $title->canTalk();
+		$this->assertSame( $expected, $actual, $title->getPrefixedDBkey() );
+	}
+
+	public static function provideGetTalkPage_good() {
+		return [
+			[ Title::makeTitle( NS_MAIN, 'Test' ), Title::makeTitle( NS_TALK, 'Test' ) ],
+			[ Title::makeTitle( NS_TALK, 'Test' ), Title::makeTitle( NS_TALK, 'Test' ) ],
+		];
+	}
+
+	/**
+	 * @dataProvider provideGetTalkPage_good
+	 * @covers Title::getTalkPage
+	 */
+	public function testGetTalkPage_good( Title $title, Title $expected ) {
+		$talk = $title->getTalkPage();
+		$this->assertSame(
+			$expected->getPrefixedDBKey(),
+			$talk->getPrefixedDBKey(),
+			$title->getPrefixedDBKey()
+		);
+	}
+
+	/**
+	 * @dataProvider provideGetTalkPage_good
+	 * @covers Title::getTalkPageIfDefined
+	 */
+	public function testGetTalkPageIfDefined_good( Title $title ) {
+		$talk = $title->getTalkPageIfDefined();
+		$this->assertInstanceOf(
+			Title::class,
+			$talk,
+			$title->getPrefixedDBKey()
+		);
+	}
+
+	public static function provideGetTalkPage_bad() {
+		return [
+			[ Title::makeTitle( NS_SPECIAL, 'Test' ) ],
+			[ Title::makeTitle( NS_MEDIA, 'Test' ) ],
+		];
+	}
+
+	/**
+	 * @dataProvider provideGetTalkPage_bad
+	 * @covers Title::getTalkPageIfDefined
+	 */
+	public function testGetTalkPageIfDefined_bad( Title $title ) {
+		$talk = $title->getTalkPageIfDefined();
+		$this->assertNull(
+			$talk,
+			$title->getPrefixedDBKey()
 		);
 	}
 
@@ -716,28 +833,33 @@ class TitleTest extends MediaWikiTestCase {
 		return [
 			// ns = 0
 			[
-				Title::makeTitle( NS_MAIN, 'Foobar' ),
-				'Foobar'
+				Title::makeTitle( NS_MAIN, 'Foo bar' ),
+				'Foo bar'
 			],
 			// ns = 2
 			[
-				Title::makeTitle( NS_USER, 'Foobar' ),
-				'User:Foobar'
+				Title::makeTitle( NS_USER, 'Foo bar' ),
+				'User:Foo bar'
+			],
+			// ns = 3
+			[
+				Title::makeTitle( NS_USER_TALK, 'Foo bar' ),
+				'User talk:Foo bar'
 			],
 			// fragment not included
 			[
-				Title::makeTitle( NS_MAIN, 'Foobar', 'fragment' ),
-				'Foobar'
+				Title::makeTitle( NS_MAIN, 'Foo bar', 'fragment' ),
+				'Foo bar'
 			],
 			// ns = -2
 			[
-				Title::makeTitle( NS_MEDIA, 'Foobar' ),
-				'Media:Foobar'
+				Title::makeTitle( NS_MEDIA, 'Foo bar' ),
+				'Media:Foo bar'
 			],
 			// non-existent namespace
 			[
-				Title::makeTitle( 100000, 'Foobar' ),
-				':Foobar'
+				Title::makeTitle( 100777, 'Foo bar' ),
+				'Special:Badtitle/NS100777:Foo bar'
 			],
 		];
 	}
@@ -748,5 +870,99 @@ class TitleTest extends MediaWikiTestCase {
 	 */
 	public function testGetPrefixedText( Title $title, $expected ) {
 		$this->assertEquals( $expected, $title->getPrefixedText() );
+	}
+
+	public function provideGetPrefixedDBKey() {
+		return [
+			// ns = 0
+			[
+				Title::makeTitle( NS_MAIN, 'Foo_bar' ),
+				'Foo_bar'
+			],
+			// ns = 2
+			[
+				Title::makeTitle( NS_USER, 'Foo_bar' ),
+				'User:Foo_bar'
+			],
+			// ns = 3
+			[
+				Title::makeTitle( NS_USER_TALK, 'Foo_bar' ),
+				'User_talk:Foo_bar'
+			],
+			// fragment not included
+			[
+				Title::makeTitle( NS_MAIN, 'Foo_bar', 'fragment' ),
+				'Foo_bar'
+			],
+			// ns = -2
+			[
+				Title::makeTitle( NS_MEDIA, 'Foo_bar' ),
+				'Media:Foo_bar'
+			],
+			// non-existent namespace
+			[
+				Title::makeTitle( 100777, 'Foo_bar' ),
+				'Special:Badtitle/NS100777:Foo_bar'
+			],
+		];
+	}
+
+	/**
+	 * @covers Title::getPrefixedDBKey
+	 * @dataProvider provideGetPrefixedDBKey
+	 */
+	public function testGetPrefixedDBKey( Title $title, $expected ) {
+		$this->assertEquals( $expected, $title->getPrefixedDBkey() );
+	}
+
+	/**
+	 * @covers Title::getFragmentForURL
+	 * @dataProvider provideGetFragmentForURL
+	 *
+	 * @param string $titleStr
+	 * @param string $expected
+	 */
+	public function testGetFragmentForURL( $titleStr, $expected ) {
+		$this->setMwGlobals( [
+			'wgFragmentMode' => [ 'html5' ],
+			'wgExternalInterwikiFragmentMode' => 'legacy',
+		] );
+		$dbw = wfGetDB( DB_MASTER );
+		$dbw->insert( 'interwiki',
+			[
+				[
+					'iw_prefix' => 'de',
+					'iw_url' => 'http://de.wikipedia.org/wiki/',
+					'iw_api' => 'http://de.wikipedia.org/w/api.php',
+					'iw_wikiid' => 'dewiki',
+					'iw_local' => 1,
+					'iw_trans' => 0,
+				],
+				[
+					'iw_prefix' => 'zz',
+					'iw_url' => 'http://zzwiki.org/wiki/',
+					'iw_api' => 'http://zzwiki.org/w/api.php',
+					'iw_wikiid' => 'zzwiki',
+					'iw_local' => 0,
+					'iw_trans' => 0,
+				],
+			],
+			__METHOD__,
+			[ 'IGNORE' ]
+		);
+
+		$title = Title::newFromText( $titleStr );
+		self::assertEquals( $expected, $title->getFragmentForURL() );
+
+		$dbw->delete( 'interwiki', '*', __METHOD__ );
+	}
+
+	public function provideGetFragmentForURL() {
+		return [
+			[ 'Foo', '' ],
+			[ 'Foo#ümlåût', '#ümlåût' ],
+			[ 'de:Foo#Bå®', '#Bå®' ],
+			[ 'zz:Foo#тест', '#.D1.82.D0.B5.D1.81.D1.82' ],
+		];
 	}
 }

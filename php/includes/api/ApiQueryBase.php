@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on Sep 7, 2006
- *
  * Copyright © 2006 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -97,9 +93,7 @@ abstract class ApiQueryBase extends ApiBase {
 		return $this->mQueryModule;
 	}
 
-	/**
-	 * @see ApiBase::getParent()
-	 */
+	/** @inheritDoc */
 	public function getParent() {
 		return $this->getQuery();
 	}
@@ -121,7 +115,7 @@ abstract class ApiQueryBase extends ApiBase {
 	 * See ApiQuery::getNamedDB() for more information
 	 * @param string $name Name to assign to the database connection
 	 * @param int $db One of the DB_* constants
-	 * @param array $groups Query groups
+	 * @param string|string[] $groups Query groups
 	 * @return IDatabase
 	 */
 	public function selectNamedDB( $name, $db, $groups ) {
@@ -261,12 +255,10 @@ abstract class ApiQueryBase extends ApiBase {
 	/**
 	 * Equivalent to addWhere(array($field => $value))
 	 * @param string $field Field name
-	 * @param string|string[] $value Value; ignored if null or empty array;
+	 * @param string|string[] $value Value; ignored if null or empty array
 	 */
 	protected function addWhereFld( $field, $value ) {
-		// Use count() to its full documented capabilities to simultaneously
-		// test for null, empty array or empty countable object
-		if ( count( $value ) ) {
+		if ( $value !== null && !( is_array( $value ) && !$value ) ) {
 			$this->where[$field] = $value;
 		}
 	}
@@ -356,7 +348,6 @@ abstract class ApiQueryBase extends ApiBase {
 	 * @return ResultWrapper
 	 */
 	protected function select( $method, $extraQuery = [], array &$hookData = null ) {
-
 		$tables = array_merge(
 			$this->tables,
 			isset( $extraQuery['tables'] ) ? (array)$extraQuery['tables'] : []
@@ -455,12 +446,17 @@ abstract class ApiQueryBase extends ApiBase {
 		if ( $showBlockInfo ) {
 			$this->addFields( [
 				'ipb_id',
-				'ipb_by',
-				'ipb_by_text',
-				'ipb_reason',
 				'ipb_expiry',
 				'ipb_timestamp'
 			] );
+			$actorQuery = ActorMigration::newMigration()->getJoin( 'ipb_by' );
+			$this->addTables( $actorQuery['tables'] );
+			$this->addFields( $actorQuery['fields'] );
+			$this->addJoinConds( $actorQuery['joins'] );
+			$commentQuery = CommentStore::getStore()->getJoin( 'ipb_reason' );
+			$this->addTables( $commentQuery['tables'] );
+			$this->addFields( $commentQuery['fields'] );
+			$this->addJoinConds( $commentQuery['joins'] );
 		}
 
 		// Don't show hidden names
@@ -479,7 +475,7 @@ abstract class ApiQueryBase extends ApiBase {
 	/**
 	 * Add information (title and namespace) about a Title object to a
 	 * result array
-	 * @param array $arr Result array à la ApiResult
+	 * @param array &$arr Result array à la ApiResult
 	 * @param Title $title
 	 * @param string $prefix Module prefix
 	 */

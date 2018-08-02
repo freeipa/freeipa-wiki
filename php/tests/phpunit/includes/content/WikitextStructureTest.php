@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @covers WikiTextStructure
+ */
 class WikitextStructureTest extends MediaWikiLangTestCase {
 
 	private function getMockTitle() {
@@ -8,7 +11,7 @@ class WikitextStructureTest extends MediaWikiLangTestCase {
 
 	/**
 	 * Get parser output for Wiki text
-	 * @param $text
+	 * @param string $text
 	 * @return ParserOutput
 	 */
 	private function getParserOutput( $text ) {
@@ -18,7 +21,7 @@ class WikitextStructureTest extends MediaWikiLangTestCase {
 
 	/**
 	 * Get WikitextStructure for given text
-	 * @param $text
+	 * @param string $text
 	 * @return WikiTextStructure
 	 */
 	private function getStructure( $text ) {
@@ -101,7 +104,7 @@ END;
 		$this->assertEquals( "Opening text is opening.", $struct->getOpeningText() );
 		$this->assertEquals( "Opening text is opening.   Then we got more text",
 			$struct->getMainText() );
-		$this->assertEquals( [ "Header table  row in table  another row in table" ],
+		$this->assertEquals( [ "Header table row in table another row in table" ],
 			$struct->getAuxiliaryText() );
 	}
 }

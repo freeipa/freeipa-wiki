@@ -40,8 +40,6 @@ class DjVuImage {
 	const DJVUTXT_MEMORY_LIMIT = 300000;
 
 	/**
-	 * Constructor
-	 *
 	 * @param string $filename The DjVu file name.
 	 */
 	function __construct( $filename ) {
@@ -119,9 +117,9 @@ class DjVuImage {
 	}
 
 	function getInfo() {
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		$file = fopen( $this->mFilename, 'rb' );
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 		if ( $file === false ) {
 			wfDebug( __METHOD__ . ": missing or failed file read\n" );
 

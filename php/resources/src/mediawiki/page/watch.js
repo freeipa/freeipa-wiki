@@ -2,11 +2,22 @@
  * Animate watch/unwatch links to use asynchronous API requests to
  * watch pages, rather than navigating to a different URI.
  *
- * @class mw.page.watch.ajax
+ * Usage:
+ *
+ *     var watch = require( 'mediawiki.page.watch.ajax' );
+ *     watch.updateWatchLink(
+ *         $node,
+ *         'watch',
+ *         'loading'
+ *     );
+ *
+ * @class mw.plugin.page.watch.ajax
+ * @singleton
  */
 ( function ( mw, $ ) {
-	// The name of the page to watch or unwatch
-	var title = mw.config.get( 'wgRelevantPageName' );
+	var watch,
+		// The name of the page to watch or unwatch
+		title = mw.config.get( 'wgRelevantPageName' );
 
 	/**
 	 * Update the link text, link href attribute and (if applicable)
@@ -68,7 +79,7 @@
 	 * @return {string} The extracted action, defaults to 'view'
 	 */
 	function mwUriGetAction( url ) {
-		var action, actionPaths, key, i, m, parts;
+		var action, actionPaths, key, m, parts;
 
 		// TODO: Does MediaWiki give action path or query param
 		// precedence? If the former, move this to the bottom
@@ -81,9 +92,7 @@
 		for ( key in actionPaths ) {
 			if ( actionPaths.hasOwnProperty( key ) ) {
 				parts = actionPaths[ key ].split( '$1' );
-				for ( i = 0; i < parts.length; i++ ) {
-					parts[ i ] = mw.RegExp.escape( parts[ i ] );
-				}
+				parts = parts.map( mw.RegExp.escape );
 				m = new RegExp( parts.join( '(.+)' ) ).exec( url );
 				if ( m && m[ 1 ] ) {
 					return key;
@@ -96,14 +105,19 @@
 	}
 
 	// Expose public methods
-	mw.page.watch = {
+	watch = {
 		updateWatchLink: updateWatchLink
 	};
+	module.exports = watch;
 
 	$( function () {
-		var $links = $( '.mw-watchlink a, a.mw-watchlink' );
-		// Restrict to core interfaces, ignore user-generated content
-		$links = $links.filter( ':not( #bodyContent *, #content * )' );
+		var $links = $( '.mw-watchlink a[data-mw="interface"], a.mw-watchlink[data-mw="interface"]' );
+		if ( !$links.length ) {
+			// Fallback to the class-based exclusion method for backwards-compatibility
+			$links = $( '.mw-watchlink a, a.mw-watchlink' );
+			// Restrict to core interfaces, ignore user-generated content
+			$links = $links.filter( ':not( #bodyContent *, #content * )' );
+		}
 
 		$links.click( function ( e ) {
 			var mwTitle, action, api, $link;

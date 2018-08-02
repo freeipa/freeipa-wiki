@@ -130,7 +130,7 @@
 			[ '$ 1.50' ],
 			[ '$ 3.00' ],
 			[ '$3.50' ],
-			// Comma's sort after dots
+			// Commas sort after dots
 			// Not intentional but test to detect changes
 			[ '€ 2,99' ]
 		],
@@ -184,8 +184,8 @@
 		],
 		isoDateSortingSorted = [
 			[ '2009' ],
-			[ '2009-12-25T12:30:45' ],
 			[ '2009-12-25T12:30:45+01:00' ],
+			[ '2009-12-25T12:30:45' ],
 			[ '2009-12-25T12:30:45.001Z' ],
 			[ '2009-12-25T12:30:45.111' ],
 			[ '2010-01-31' ],
@@ -238,7 +238,7 @@
 			$tbody = $table.find( 'tbody' ),
 			$tr = $( '<tr>' );
 
-		$.each( header, function ( i, str ) {
+		header.forEach( function ( str ) {
 			var $th = $( '<th>' );
 			$th.text( str ).appendTo( $tr );
 		} );
@@ -247,7 +247,7 @@
 		for ( i = 0; i < data.length; i++ ) {
 			$tr = $( '<tr>' );
 			// eslint-disable-next-line no-loop-func
-			$.each( data[ i ], function ( j, str ) {
+			data[ i ].forEach( function ( str ) {
 				var $td = $( '<td>' );
 				$td.text( str ).appendTo( $tr );
 			} );
@@ -286,7 +286,7 @@
 	 * @param {function($table)} callback something to do with the table before we compare
 	 */
 	function tableTest( msg, header, data, expected, callback ) {
-		QUnit.test( msg, 1, function ( assert ) {
+		QUnit.test( msg, function ( assert ) {
 			var extracted,
 				$table = tableCreate( header, data );
 
@@ -310,7 +310,7 @@
 	 * @param {function($table)} callback Something to do with the table before we compare
 	 */
 	function tableTestHTML( msg, html, expected, callback ) {
-		QUnit.test( msg, 1, function ( assert ) {
+		QUnit.test( msg, function ( assert ) {
 			var extracted,
 				$table = $( html );
 

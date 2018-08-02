@@ -19,8 +19,6 @@
  * @ingroup RevisionDelete
  */
 
-use Wikimedia\Rdbms\IDatabase;
-
 /**
  * Item class for an oldimage table row
  */
@@ -49,6 +47,10 @@ class RevDelFileItem extends RevDelItem {
 
 	public function getAuthorNameField() {
 		return 'oi_user_text';
+	}
+
+	public function getAuthorActorField() {
+		return 'oi_actor';
 	}
 
 	public function getId() {

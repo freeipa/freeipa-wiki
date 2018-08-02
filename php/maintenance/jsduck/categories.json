@@ -23,6 +23,7 @@
 					"mw.Title",
 					"mw.Uri",
 					"mw.RegExp",
+					"mw.String",
 					"mw.messagePoster.*",
 					"mw.notification",
 					"mw.Notification_",
@@ -34,7 +35,8 @@
 					"mw.cookie",
 					"mw.experiments",
 					"mw.viewport",
-					"mw.htmlform.*"
+					"mw.htmlform.*",
+					"mw.visibleTimeout"
 				]
 			},
 			{
@@ -54,19 +56,14 @@
 				]
 			},
 			{
-				"name": "Page",
-				"classes": [
-					"mw.page*"
-				]
-			},
-			{
 				"name": "Interfaces",
 				"classes": [
 					"mw.Feedback*",
 					"mw.Upload*",
 					"mw.ForeignUpload",
 					"mw.ForeignStructuredUpload*",
-					"mw.GallerySlideshow"
+					"mw.GallerySlideshow",
+					"mw.rcfilters*"
 				]
 			},
 			{

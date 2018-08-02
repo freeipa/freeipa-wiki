@@ -18,7 +18,7 @@
 	}
 
 	function sequenceBodies( status, headers, bodies ) {
-		jQuery.each( bodies, function ( i, body ) {
+		bodies.forEach( function ( body, i ) {
 			bodies[ i ] = [ status, headers, body ];
 		} );
 		return sequence( bodies );
@@ -203,7 +203,7 @@
 
 		// Don't cache error (T67268)
 		return api.getToken( 'testerror' )
-			.then( null, function ( err ) {
+			.catch( function ( err ) {
 				assert.equal( err, 'bite-me', 'Expected error' );
 
 				return api.getToken( 'testerror' );
@@ -335,8 +335,7 @@
 					'X-Foo': 'Bar'
 				}
 			}
-		)
-		.then( function () {
+		).then( function () {
 			assert.equal( test.server.requests[ 0 ].requestHeaders[ 'X-Foo' ], 'Bar', 'Header sent' );
 
 			return api.postWithToken( 'csrf',
@@ -345,8 +344,7 @@
 					assert.ok( false, 'This parameter cannot be a callback' );
 				}
 			);
-		} )
-		.then( function ( data ) {
+		} ).then( function ( data ) {
 			assert.equal( data.example, 'quux' );
 
 			assert.equal( test.server.requests.length, 2, 'Request made' );
@@ -451,7 +449,7 @@
 		} );
 		this.api.abort();
 		assert.ok( this.requests.length === 2, 'Check both requests triggered' );
-		$.each( this.requests, function ( i, request ) {
+		this.requests.forEach( function ( request, i ) {
 			assert.ok( request.abort.calledOnce, 'abort request number ' + i );
 		} );
 	} );

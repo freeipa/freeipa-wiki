@@ -29,8 +29,8 @@ use Wikimedia\Rdbms\IDatabase;
  * Abstraction for ResourceLoader modules which pull from wiki pages
  *
  * This can only be used for wiki pages in the MediaWiki and User namespaces,
- * because of its dependence on the functionality of Title::isCssJsSubpage
- * and Title::isCssOrJsPage().
+ * because of its dependence on the functionality of Title::isUserConfigPage()
+ * and Title::isSiteConfigPage().
  *
  * This module supports being used as a placeholder for a module on a remote wiki.
  * To do so, getDB() must be overloaded to return a foreign database object that
@@ -183,12 +183,10 @@ class ResourceLoaderWikiModule extends ResourceLoaderModule {
 	 * @return Content|null
 	 */
 	protected function getContentObj( Title $title ) {
-		$revision = Revision::newKnownCurrent( wfGetDB( DB_REPLICA ), $title->getArticleID(),
-			$title->getLatestRevID() );
+		$revision = Revision::newKnownCurrent( wfGetDB( DB_REPLICA ), $title );
 		if ( !$revision ) {
 			return null;
 		}
-		$revision->setTitle( $title );
 		$content = $revision->getContent( Revision::RAW );
 		if ( !$content ) {
 			wfDebugLog( 'resourceloader', __METHOD__ . ': failed to load content of JS/CSS page!' );
@@ -373,7 +371,7 @@ class ResourceLoaderWikiModule extends ResourceLoaderModule {
 			if ( $module instanceof self ) {
 				$mDB = $module->getDB();
 				// Subclasses may disable getDB and implement getTitleInfo differently
-				if ( $mDB && $mDB->getWikiID() === $db->getWikiID() ) {
+				if ( $mDB && $mDB->getDomainID() === $db->getDomainID() ) {
 					$wikiModules[] = $module;
 					$allPages += $module->getPages( $context );
 				}
@@ -395,14 +393,17 @@ class ResourceLoaderWikiModule extends ResourceLoaderModule {
 
 		$cache = ObjectCache::getMainWANInstance();
 		$allInfo = $cache->getWithSetCallback(
-			$cache->makeGlobalKey( 'resourceloader', 'titleinfo', $db->getWikiID(), $hash ),
+			$cache->makeGlobalKey( 'resourceloader', 'titleinfo', $db->getDomainID(), $hash ),
 			$cache::TTL_HOUR,
 			function ( $curVal, &$ttl, array &$setOpts ) use ( $func, $pageNames, $db, $fname ) {
 				$setOpts += Database::getCacheSetOptions( $db );
 
 				return call_user_func( $func, $db, $pageNames, $fname );
 			},
-			[ 'checkKeys' => [ $cache->makeGlobalKey( 'resourceloader', 'titleinfo', $db->getWikiID() ) ] ]
+			[
+				'checkKeys' => [
+					$cache->makeGlobalKey( 'resourceloader', 'titleinfo', $db->getDomainID() ) ]
+			]
 		);
 
 		foreach ( $wikiModules as $wikiModule ) {
@@ -449,7 +450,7 @@ class ResourceLoaderWikiModule extends ResourceLoaderModule {
 		} elseif ( $new && in_array( $new->getContentFormat(), $formats ) ) {
 			$purge = true;
 		} else {
-			$purge = ( $title->isCssOrJsPage() || $title->isCssJsSubpage() );
+			$purge = ( $title->isSiteConfigPage() || $title->isUserConfigPage() );
 		}
 
 		if ( $purge ) {

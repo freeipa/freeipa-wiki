@@ -85,7 +85,7 @@ abstract class MediaHandler {
 	 * Should be idempotent.
 	 * Returns false if the parameters are unacceptable and the transform should fail
 	 * @param File $image
-	 * @param array $params
+	 * @param array &$params
 	 */
 	abstract function normaliseParams( $image, &$params );
 
@@ -157,11 +157,10 @@ abstract class MediaHandler {
 	 */
 	function convertMetadataVersion( $metadata, $version = 1 ) {
 		if ( !is_array( $metadata ) ) {
-
 			// unserialize to keep return parameter consistent.
-			MediaWiki\suppressWarnings();
+			Wikimedia\suppressWarnings();
 			$ret = unserialize( $metadata );
-			MediaWiki\restoreWarnings();
+			Wikimedia\restoreWarnings();
 
 			return $ret;
 		}
@@ -256,7 +255,7 @@ abstract class MediaHandler {
 	 * Get a MediaTransformOutput object representing the transformed output. Does not
 	 * actually do the transform.
 	 *
-	 * @param File $image The image object
+	 * @param File $image
 	 * @param string $dstPath Filesystem destination path
 	 * @param string $dstUrl Destination URL to use in output HTML
 	 * @param array $params Arbitrary set of parameters validated by $this->validateParam()
@@ -270,7 +269,7 @@ abstract class MediaHandler {
 	 * Get a MediaTransformOutput object representing the transformed output. Does the
 	 * transform unless $flags contains self::TRANSFORM_LATER.
 	 *
-	 * @param File $image The image object
+	 * @param File $image
 	 * @param string $dstPath Filesystem destination path
 	 * @param string $dstUrl Destination URL to use in output HTML
 	 * @param array $params Arbitrary set of parameters validated by $this->validateParam()
@@ -289,7 +288,7 @@ abstract class MediaHandler {
 	 * @return array Thumbnail extension and MIME type
 	 */
 	function getThumbType( $ext, $mime, $params = null ) {
-		$magic = MimeMagic::singleton();
+		$magic = MediaWiki\MediaWikiServices::getInstance()->getMimeAnalyzer();
 		if ( !$ext || $magic->isMatchingExtension( $ext, $mime ) === false ) {
 			// The extension is not valid for this MIME type and we do
 			// recognize the MIME type
@@ -305,13 +304,13 @@ abstract class MediaHandler {
 	}
 
 	/**
-	 * Get useful response headers for GET/HEAD requests for a file with the given metadata
-	 *
-	 * @param mixed $metadata Result of the getMetadata() function of this handler for a file
+	 * @deprecated since 1.30, use MediaHandler::getContentHeaders instead
+	 * @param array $metadata
 	 * @return array
 	 */
 	public function getStreamHeaders( $metadata ) {
-		return [];
+		wfDeprecated( __METHOD__, '1.30' );
+		return $this->getContentHeaders( $metadata );
 	}
 
 	/**
@@ -498,7 +497,7 @@ abstract class MediaHandler {
 	 *
 	 * This is used by the media handlers that use the FormatMetadata class
 	 *
-	 * @param array $metadataArray Metadata array
+	 * @param array $metadataArray
 	 * @param bool|IContextSource $context Context to use (optional)
 	 * @return array Array for use displaying metadata.
 	 */
@@ -715,7 +714,7 @@ abstract class MediaHandler {
 	 *
 	 * @see LocalFile::purgeThumbnails
 	 *
-	 * @param array $files
+	 * @param array &$files
 	 * @param array $options Purge options. Currently will always be
 	 *  an array with a single key 'forThumbRefresh' set to true.
 	 */
@@ -867,5 +866,61 @@ abstract class MediaHandler {
 	 */
 	public function getWarningConfig( $file ) {
 		return null;
+	}
+
+	/**
+	 * Converts a dimensions array about a potentially multipage document from an
+	 * exhaustive list of ordered page numbers to a list of page ranges
+	 * @param Array $pagesByDimensions
+	 * @return String
+	 * @since 1.30
+	 */
+	public static function getPageRangesByDimensions( $pagesByDimensions ) {
+		$pageRangesByDimensions = [];
+
+		foreach ( $pagesByDimensions as $dimensions => $pageList ) {
+			$ranges = [];
+			$firstPage = $pageList[0];
+			$lastPage = $firstPage - 1;
+
+			foreach ( $pageList as $page ) {
+				if ( $page > $lastPage + 1 ) {
+					if ( $firstPage != $lastPage ) {
+						$ranges[] = "$firstPage-$lastPage";
+					} else {
+						$ranges[] = "$firstPage";
+					}
+
+					$firstPage = $page;
+				}
+
+				$lastPage = $page;
+			}
+
+			if ( $firstPage != $lastPage ) {
+				$ranges[] = "$firstPage-$lastPage";
+			} else {
+				$ranges[] = "$firstPage";
+			}
+
+			$pageRangesByDimensions[ $dimensions ] = $ranges;
+		}
+
+		$dimensionsString = [];
+		foreach ( $pageRangesByDimensions as $dimensions => $pageRanges ) {
+			$dimensionsString[] = "$dimensions:" . implode( ',', $pageRanges );
+		}
+
+		return implode( '/', $dimensionsString );
+	}
+
+	/**
+	 * Get useful response headers for GET/HEAD requests for a file with the given metadata
+	 * @param array $metadata Contains this handler's unserialized getMetadata() for a file
+	 * @return array
+	 * @since 1.30
+	 */
+	public function getContentHeaders( $metadata ) {
+		return [ 'X-Content-Dimensions' => '' ]; // T175689
 	}
 }

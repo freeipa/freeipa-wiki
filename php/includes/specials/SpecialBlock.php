@@ -99,7 +99,6 @@ class SpecialBlock extends FormSpecialPage {
 	 * @param HTMLForm $form
 	 */
 	protected function alterForm( HTMLForm $form ) {
-		$form->setWrapperLegendMsg( 'blockip-legend' );
 		$form->setHeaderText( '' );
 		$form->setSubmitDestructive();
 
@@ -121,6 +120,10 @@ class SpecialBlock extends FormSpecialPage {
 		}
 	}
 
+	protected function getDisplayFormat() {
+		return 'ooui';
+	}
+
 	/**
 	 * Get the HTMLForm descriptor array for the block form
 	 * @return array
@@ -132,16 +135,20 @@ class SpecialBlock extends FormSpecialPage {
 
 		$suggestedDurations = self::getSuggestedDurations();
 
+		$conf = $this->getConfig();
+		$oldCommentSchema = $conf->get( 'CommentTableSchemaMigrationStage' ) === MIGRATION_OLD;
+
 		$a = [
 			'Target' => [
-				'type' => 'text',
+				'type' => 'user',
+				'ipallowed' => true,
+				'iprange' => true,
 				'label-message' => 'ipaddressorusername',
 				'id' => 'mw-bi-target',
 				'size' => '45',
 				'autofocus' => true,
 				'required' => true,
 				'validation-callback' => [ __CLASS__, 'validateTargetField' ],
-				'cssclass' => 'mw-autocomplete-user', // used by mediawiki.userSuggest
 			],
 			'Expiry' => [
 				'type' => !count( $suggestedDurations ) ? 'text' : 'selectorother',
@@ -153,7 +160,11 @@ class SpecialBlock extends FormSpecialPage {
 			],
 			'Reason' => [
 				'type' => 'selectandother',
-				'maxlength' => 255,
+				// HTML maxlength uses "UTF-16 code units", which means that characters outside BMP
+				// (e.g. emojis) count for two each. This limit is overridden in JS to instead count
+				// Unicode codepoints (or 255 UTF-8 bytes for old schema).
+				'maxlength' => $oldCommentSchema ? 255 : CommentStore::COMMENT_CHARACTER_LIMIT,
+				'maxlength-unit' => 'codepoints',
 				'label-message' => 'ipbreason',
 				'options-message' => 'ipbreason-dropdown',
 			],
@@ -220,6 +231,7 @@ class SpecialBlock extends FormSpecialPage {
 			'type' => 'hidden',
 			'default' => '',
 			'label-message' => 'ipb-confirm',
+			'cssclass' => 'mw-block-confirm',
 		];
 
 		$this->maybeAlterFormDefaults( $a );
@@ -233,7 +245,7 @@ class SpecialBlock extends FormSpecialPage {
 	/**
 	 * If the user has already been blocked with similar settings, load that block
 	 * and change the defaults for the form fields to match the existing settings.
-	 * @param array $fields HTMLForm descriptor array
+	 * @param array &$fields HTMLForm descriptor array
 	 * @return bool Whether fields were altered (that is, whether the target is
 	 *     already blocked)
 	 */
@@ -323,7 +335,7 @@ class SpecialBlock extends FormSpecialPage {
 	 * @return string
 	 */
 	protected function preText() {
-		$this->getOutput()->addModules( [ 'mediawiki.special.block', 'mediawiki.userSuggest' ] );
+		$this->getOutput()->addModules( [ 'mediawiki.special.block' ] );
 
 		$blockCIDRLimit = $this->getConfig()->get( 'BlockCIDRLimit' );
 		$text = $this->msg( 'blockiptext', $blockCIDRLimit['IPv4'], $blockCIDRLimit['IPv6'] )->parse();
@@ -484,7 +496,7 @@ class SpecialBlock extends FormSpecialPage {
 	 * @param string $par Subpage parameter passed to setup, or data value from
 	 *     the HTMLForm
 	 * @param WebRequest $request Optionally try and get data from a request too
-	 * @return array( User|string|null, Block::TYPE_ constant|null )
+	 * @return array [ User|string|null, Block::TYPE_ constant|null ]
 	 */
 	public static function getTargetAndType( $par, WebRequest $request = null ) {
 		$i = 0;
@@ -618,7 +630,7 @@ class SpecialBlock extends FormSpecialPage {
 	 * @return bool|string
 	 */
 	public static function processForm( array $data, IContextSource $context ) {
-		global $wgBlockAllowsUTEdit, $wgHideUserContribLimit, $wgContLang;
+		global $wgBlockAllowsUTEdit, $wgHideUserContribLimit;
 
 		$performer = $context->getUser();
 
@@ -720,8 +732,7 @@ class SpecialBlock extends FormSpecialPage {
 		$block = new Block();
 		$block->setTarget( $target );
 		$block->setBlocker( $performer );
-		# Truncate reason for whole multibyte characters
-		$block->mReason = $wgContLang->truncate( $data['Reason'][0], 255 );
+		$block->mReason = $data['Reason'][0];
 		$block->mExpiry = $expiryTime;
 		$block->prevents( 'createaccount', $data['CreateAccount'] );
 		$block->prevents( 'editownusertalk', ( !$wgBlockAllowsUTEdit || $data['DisableUTEdit'] ) );

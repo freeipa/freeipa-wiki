@@ -18,7 +18,6 @@
  * @file
  */
 
-use MediaWiki\Logger\LoggerFactory;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\NullLogger;
@@ -30,11 +29,15 @@ use Psr\Log\NullLogger;
  * Renamed from HttpRequest to MWHttpRequest to avoid conflict with
  * PHP's HTTP extension.
  */
-class MWHttpRequest implements LoggerAwareInterface {
+abstract class MWHttpRequest implements LoggerAwareInterface {
 	const SUPPORTS_FILE_POSTS = false;
 
-	protected $content;
+	/**
+	 * @var int|string
+	 */
 	protected $timeout = 'default';
+
+	protected $content;
 	protected $headersOnly = null;
 	protected $postData = null;
 	protected $proxy = null;
@@ -46,7 +49,7 @@ class MWHttpRequest implements LoggerAwareInterface {
 	protected $reqHeaders = [];
 	protected $url;
 	protected $parsedUrl;
-	/** @var callable  */
+	/** @var callable */
 	protected $callback;
 	protected $maxRedirects = 5;
 	protected $followRedirects = false;
@@ -76,7 +79,7 @@ class MWHttpRequest implements LoggerAwareInterface {
 	protected $profileName;
 
 	/**
-	 * @var LoggerInterface;
+	 * @var LoggerInterface
 	 */
 	protected $logger;
 
@@ -86,8 +89,8 @@ class MWHttpRequest implements LoggerAwareInterface {
 	 * @param string $caller The method making this request, for profiling
 	 * @param Profiler $profiler An instance of the profiler for profiling, or null
 	 */
-	protected function __construct(
-		$url, $options = [], $caller = __METHOD__, $profiler = null
+	public function __construct(
+		$url, array $options = [], $caller = __METHOD__, $profiler = null
 	) {
 		global $wgHTTPTimeout, $wgHTTPConnectTimeout;
 
@@ -170,44 +173,21 @@ class MWHttpRequest implements LoggerAwareInterface {
 
 	/**
 	 * Generate a new request object
+	 * Deprecated: @see HttpRequestFactory::create
 	 * @param string $url Url to use
-	 * @param array $options (optional) extra params to pass (see Http::request())
+	 * @param array|null $options (optional) extra params to pass (see Http::request())
 	 * @param string $caller The method making this request, for profiling
 	 * @throws DomainException
-	 * @return CurlHttpRequest|PhpHttpRequest
+	 * @return MWHttpRequest
 	 * @see MWHttpRequest::__construct
 	 */
-	public static function factory( $url, $options = null, $caller = __METHOD__ ) {
-		if ( !Http::$httpEngine ) {
-			Http::$httpEngine = function_exists( 'curl_init' ) ? 'curl' : 'php';
-		} elseif ( Http::$httpEngine == 'curl' && !function_exists( 'curl_init' ) ) {
-			throw new DomainException( __METHOD__ . ': curl (http://php.net/curl) is not installed, but' .
-				' Http::$httpEngine is set to "curl"' );
-		}
-
-		if ( !is_array( $options ) ) {
+	public static function factory( $url, array $options = null, $caller = __METHOD__ ) {
+		if ( $options === null ) {
 			$options = [];
 		}
-
-		if ( !isset( $options['logger'] ) ) {
-			$options['logger'] = LoggerFactory::getInstance( 'http' );
-		}
-
-		switch ( Http::$httpEngine ) {
-			case 'curl':
-				return new CurlHttpRequest( $url, $options, $caller, Profiler::instance() );
-			case 'php':
-				if ( !wfIniGetBool( 'allow_url_fopen' ) ) {
-					throw new DomainException( __METHOD__ . ': allow_url_fopen ' .
-						'needs to be enabled for pure PHP http requests to ' .
-						'work. If possible, curl should be used instead. See ' .
-						'http://php.net/curl.'
-					);
-				}
-				return new PhpHttpRequest( $url, $options, $caller, Profiler::instance() );
-			default:
-				throw new DomainException( __METHOD__ . ': The setting of Http::$httpEngine is not valid.' );
-		}
+		return \MediaWiki\MediaWikiServices::getInstance()
+			->getHttpRequestFactory()
+			->create( $url, $options, $caller );
 	}
 
 	/**

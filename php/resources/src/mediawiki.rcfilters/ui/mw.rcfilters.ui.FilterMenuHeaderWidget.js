@@ -2,6 +2,7 @@
 	/**
 	 * Menu header for the RCFilters filters menu
 	 *
+	 * @class
 	 * @extends OO.ui.Widget
 	 *
 	 * @constructor
@@ -25,6 +26,26 @@
 				.addClass( 'mw-rcfilters-ui-filterMenuHeaderWidget-title' )
 		}, config ) );
 
+		// "Back" to default view button
+		this.backButton = new OO.ui.ButtonWidget( {
+			icon: 'previous',
+			framed: false,
+			title: mw.msg( 'rcfilters-view-return-to-default-tooltip' ),
+			classes: [ 'mw-rcfilters-ui-filterMenuHeaderWidget-backButton' ]
+		} );
+		this.backButton.toggle( this.model.getCurrentView() !== 'default' );
+
+		// Help icon for Tagged edits
+		this.helpIcon = new OO.ui.ButtonWidget( {
+			icon: 'help',
+			framed: false,
+			title: mw.msg( 'rcfilters-view-tags-help-icon-tooltip' ),
+			classes: [ 'mw-rcfilters-ui-filterMenuHeaderWidget-helpIcon' ],
+			href: mw.util.getUrl( 'Special:Tags' ),
+			target: '_blank'
+		} );
+		this.helpIcon.toggle( this.model.getCurrentView() === 'tags' );
+
 		// Highlight button
 		this.highlightButton = new OO.ui.ToggleButtonWidget( {
 			icon: 'highlight',
@@ -32,10 +53,25 @@
 			classes: [ 'mw-rcfilters-ui-filterMenuHeaderWidget-hightlightButton' ]
 		} );
 
+		// Invert namespaces button
+		this.invertNamespacesButton = new OO.ui.ToggleButtonWidget( {
+			icon: '',
+			classes: [ 'mw-rcfilters-ui-filterMenuHeaderWidget-invertNamespacesButton' ]
+		} );
+		this.invertNamespacesButton.toggle( this.model.getCurrentView() === 'namespaces' );
+
 		// Events
+		this.backButton.connect( this, { click: 'onBackButtonClick' } );
 		this.highlightButton
 			.connect( this, { click: 'onHighlightButtonClick' } );
-		this.model.connect( this, { highlightChange: 'onModelHighlightChange' } );
+		this.invertNamespacesButton
+			.connect( this, { click: 'onInvertNamespacesButtonClick' } );
+		this.model.connect( this, {
+			highlightChange: 'onModelHighlightChange',
+			searchChange: 'onModelSearchChange',
+			initialize: 'onModelInitialize'
+		} );
+		this.view = this.model.getCurrentView();
 
 		// Initialize
 		this.$element
@@ -50,8 +86,16 @@
 							.append(
 								$( '<div>' )
 									.addClass( 'mw-rcfilters-ui-cell' )
+									.addClass( 'mw-rcfilters-ui-filterMenuHeaderWidget-header-back' )
+									.append( this.backButton.$element ),
+								$( '<div>' )
+									.addClass( 'mw-rcfilters-ui-cell' )
 									.addClass( 'mw-rcfilters-ui-filterMenuHeaderWidget-header-title' )
-									.append( this.$label ),
+									.append( this.$label, this.helpIcon.$element ),
+								$( '<div>' )
+									.addClass( 'mw-rcfilters-ui-cell' )
+									.addClass( 'mw-rcfilters-ui-filterMenuHeaderWidget-header-invert' )
+									.append( this.invertNamespacesButton.$element ),
 								$( '<div>' )
 									.addClass( 'mw-rcfilters-ui-cell' )
 									.addClass( 'mw-rcfilters-ui-filterMenuHeaderWidget-header-highlight' )
@@ -69,6 +113,35 @@
 	/* Methods */
 
 	/**
+	 * Respond to model initialization event
+	 *
+	 * Note: need to wait for initialization before getting the invertModel
+	 * and registering its update event. Creating all the models before the UI
+	 * would help with that.
+	 */
+	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.onModelInitialize = function () {
+		this.invertModel = this.model.getInvertModel();
+		this.updateInvertButton();
+		this.invertModel.connect( this, { update: 'updateInvertButton' } );
+	};
+
+	/**
+	 * Respond to model update event
+	 */
+	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.onModelSearchChange = function () {
+		var currentView = this.model.getCurrentView();
+
+		if ( this.view !== currentView ) {
+			this.setLabel( this.model.getViewTitle( currentView ) );
+
+			this.invertNamespacesButton.toggle( currentView === 'namespaces' );
+			this.backButton.toggle( currentView !== 'default' );
+			this.helpIcon.toggle( currentView === 'tags' );
+			this.view = currentView;
+		}
+	};
+
+	/**
 	 * Respond to model highlight change event
 	 *
 	 * @param {boolean} highlightEnabled Highlight is enabled
@@ -78,9 +151,32 @@
 	};
 
 	/**
+	 * Update the state of the invert button
+	 */
+	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.updateInvertButton = function () {
+		this.invertNamespacesButton.setActive( this.invertModel.isSelected() );
+		this.invertNamespacesButton.setLabel(
+			this.invertModel.isSelected() ?
+				mw.msg( 'rcfilters-exclude-button-on' ) :
+				mw.msg( 'rcfilters-exclude-button-off' )
+		);
+	};
+
+	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.onBackButtonClick = function () {
+		this.controller.switchView( 'default' );
+	};
+
+	/**
 	 * Respond to highlight button click
 	 */
 	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.onHighlightButtonClick = function () {
 		this.controller.toggleHighlight();
+	};
+
+	/**
+	 * Respond to highlight button click
+	 */
+	mw.rcfilters.ui.FilterMenuHeaderWidget.prototype.onInvertNamespacesButtonClick = function () {
+		this.controller.toggleInvertedNamespaces();
 	};
 }( mediaWiki, jQuery ) );

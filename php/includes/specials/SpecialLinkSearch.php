@@ -22,7 +22,7 @@
  * @author Brion Vibber
  */
 
-use Wikimedia\Rdbms\ResultWrapper;
+use Wikimedia\Rdbms\IResultWrapper;
 use Wikimedia\Rdbms\IDatabase;
 
 /**
@@ -225,7 +225,7 @@ class LinkSearchPage extends QueryPage {
 	 * Pre-fill the link cache
 	 *
 	 * @param IDatabase $db
-	 * @param ResultWrapper $res
+	 * @param IResultWrapper $res
 	 */
 	function preprocessResults( $db, $res ) {
 		$this->executeLBFromResultWrapper( $res );
@@ -266,6 +266,7 @@ class LinkSearchPage extends QueryPage {
 	 *
 	 * @see T130058
 	 * @todo FIXME This special page should not use LIMIT for paging
+	 * @return int
 	 */
 	protected function getMaxResults() {
 		return max( parent::getMaxResults(), 60000 );

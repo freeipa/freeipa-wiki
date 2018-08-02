@@ -136,7 +136,7 @@ abstract class ContentHandler {
 			$modelId = $title->getContentModel();
 		}
 
-		$handler = ContentHandler::getForModelID( $modelId );
+		$handler = self::getForModelID( $modelId );
 
 		return $handler->unserializeContent( $text, $format );
 	}
@@ -240,7 +240,7 @@ abstract class ContentHandler {
 	public static function getForTitle( Title $title ) {
 		$modelId = $title->getContentModel();
 
-		return ContentHandler::getForModelID( $modelId );
+		return self::getForModelID( $modelId );
 	}
 
 	/**
@@ -256,7 +256,7 @@ abstract class ContentHandler {
 	public static function getForContent( Content $content ) {
 		$modelId = $content->getModel();
 
-		return ContentHandler::getForModelID( $modelId );
+		return self::getForModelID( $modelId );
 	}
 
 	/**
@@ -293,8 +293,8 @@ abstract class ContentHandler {
 	public static function getForModelID( $modelId ) {
 		global $wgContentHandlers;
 
-		if ( isset( ContentHandler::$handlers[$modelId] ) ) {
-			return ContentHandler::$handlers[$modelId];
+		if ( isset( self::$handlers[$modelId] ) ) {
+			return self::$handlers[$modelId];
 		}
 
 		if ( empty( $wgContentHandlers[$modelId] ) ) {
@@ -327,9 +327,16 @@ abstract class ContentHandler {
 		wfDebugLog( 'ContentHandler', 'Created handler for ' . $modelId
 			. ': ' . get_class( $handler ) );
 
-		ContentHandler::$handlers[$modelId] = $handler;
+		self::$handlers[$modelId] = $handler;
 
-		return ContentHandler::$handlers[$modelId];
+		return self::$handlers[$modelId];
+	}
+
+	/**
+	 * Clean up handlers cache.
+	 */
+	public static function cleanupHandlersCache() {
+		self::$handlers = [];
 	}
 
 	/**
@@ -372,7 +379,7 @@ abstract class ContentHandler {
 		$formats = [];
 
 		foreach ( $wgContentHandlers as $model => $class ) {
-			$handler = ContentHandler::getForModelID( $model );
+			$handler = self::getForModelID( $model );
 			$formats = array_merge( $formats, $handler->getSupportedFormats() );
 		}
 
@@ -619,8 +626,8 @@ abstract class ContentHandler {
 	 */
 	public function createDifferenceEngine( IContextSource $context, $old = 0, $new = 0,
 		$rcid = 0, // FIXME: Deprecated, no longer used
-		$refreshCache = false, $unhide = false ) {
-
+		$refreshCache = false, $unhide = false
+	) {
 		// hook: get difference engine
 		$differenceEngine = null;
 		if ( !Hooks::run( 'GetDifferenceEngine',
@@ -755,81 +762,189 @@ abstract class ContentHandler {
 	}
 
 	/**
+	 * Return type of change if one exists for the given edit.
+	 *
+	 * @since 1.31
+	 *
+	 * @param Content|null $oldContent The previous text of the page.
+	 * @param Content|null $newContent The submitted text of the page.
+	 * @param int $flags Bit mask: a bit mask of flags submitted for the edit.
+	 *
+	 * @return string|null String key representing type of change, or null.
+	 */
+	private function getChangeType(
+		Content $oldContent = null,
+		Content $newContent = null,
+		$flags = 0
+	) {
+		$oldTarget = $oldContent !== null ? $oldContent->getRedirectTarget() : null;
+		$newTarget = $newContent !== null ? $newContent->getRedirectTarget() : null;
+
+		// We check for the type of change in the given edit, and return string key accordingly
+
+		// Blanking of a page
+		if ( $oldContent && $oldContent->getSize() > 0 &&
+			$newContent && $newContent->getSize() === 0
+		) {
+			return 'blank';
+		}
+
+		// Redirects
+		if ( $newTarget ) {
+			if ( !$oldTarget ) {
+				// New redirect page (by creating new page or by changing content page)
+				return 'new-redirect';
+			} elseif ( !$newTarget->equals( $oldTarget ) ||
+				$oldTarget->getFragment() !== $newTarget->getFragment()
+			) {
+				// Redirect target changed
+				return 'changed-redirect-target';
+			}
+		} elseif ( $oldTarget ) {
+			// Changing an existing redirect into a non-redirect
+			return 'removed-redirect';
+		}
+
+		// New page created
+		if ( $flags & EDIT_NEW && $newContent ) {
+			if ( $newContent->getSize() === 0 ) {
+				// New blank page
+				return 'newblank';
+			} else {
+				return 'newpage';
+			}
+		}
+
+		// Removing more than 90% of the page
+		if ( $oldContent && $newContent && $oldContent->getSize() > 10 * $newContent->getSize() ) {
+			return 'replace';
+		}
+
+		// Content model changed
+		if ( $oldContent && $newContent && $oldContent->getModel() !== $newContent->getModel() ) {
+			return 'contentmodelchange';
+		}
+
+		return null;
+	}
+
+	/**
 	 * Return an applicable auto-summary if one exists for the given edit.
 	 *
 	 * @since 1.21
 	 *
-	 * @param Content $oldContent The previous text of the page.
-	 * @param Content $newContent The submitted text of the page.
+	 * @param Content|null $oldContent The previous text of the page.
+	 * @param Content|null $newContent The submitted text of the page.
 	 * @param int $flags Bit mask: a bit mask of flags submitted for the edit.
 	 *
 	 * @return string An appropriate auto-summary, or an empty string.
 	 */
-	public function getAutosummary( Content $oldContent = null, Content $newContent = null,
-		$flags ) {
+	public function getAutosummary(
+		Content $oldContent = null,
+		Content $newContent = null,
+		$flags = 0
+	) {
+		$changeType = $this->getChangeType( $oldContent, $newContent, $flags );
+
+		// There's no applicable auto-summary for our case, so our auto-summary is empty.
+		if ( !$changeType ) {
+			return '';
+		}
+
 		// Decide what kind of auto-summary is needed.
-
-		// Redirect auto-summaries
-
-		/**
-		 * @var $ot Title
-		 * @var $rt Title
-		 */
-
-		$ot = !is_null( $oldContent ) ? $oldContent->getRedirectTarget() : null;
-		$rt = !is_null( $newContent ) ? $newContent->getRedirectTarget() : null;
-
-		if ( is_object( $rt ) ) {
-			if ( !is_object( $ot )
-				|| !$rt->equals( $ot )
-				|| $ot->getFragment() != $rt->getFragment()
-			) {
+		switch ( $changeType ) {
+			case 'new-redirect':
+				$newTarget = $newContent->getRedirectTarget();
 				$truncatedtext = $newContent->getTextForSummary(
 					250
 					- strlen( wfMessage( 'autoredircomment' )->inContentLanguage()->text() )
-					- strlen( $rt->getFullText() ) );
+					- strlen( $newTarget->getFullText() )
+				);
 
-				return wfMessage( 'autoredircomment', $rt->getFullText() )
+				return wfMessage( 'autoredircomment', $newTarget->getFullText() )
+					->plaintextParams( $truncatedtext )->inContentLanguage()->text();
+			case 'changed-redirect-target':
+				$oldTarget = $oldContent->getRedirectTarget();
+				$newTarget = $newContent->getRedirectTarget();
+
+				$truncatedtext = $newContent->getTextForSummary(
+					250
+					- strlen( wfMessage( 'autosumm-changed-redirect-target' )
+						->inContentLanguage()->text() )
+					- strlen( $oldTarget->getFullText() )
+					- strlen( $newTarget->getFullText() )
+				);
+
+				return wfMessage( 'autosumm-changed-redirect-target',
+						$oldTarget->getFullText(),
+						$newTarget->getFullText() )
 					->rawParams( $truncatedtext )->inContentLanguage()->text();
-			}
+			case 'removed-redirect':
+				$oldTarget = $oldContent->getRedirectTarget();
+				$truncatedtext = $newContent->getTextForSummary(
+					250
+					- strlen( wfMessage( 'autosumm-removed-redirect' )
+						->inContentLanguage()->text() )
+					- strlen( $oldTarget->getFullText() ) );
+
+				return wfMessage( 'autosumm-removed-redirect', $oldTarget->getFullText() )
+					->rawParams( $truncatedtext )->inContentLanguage()->text();
+			case 'newpage':
+				// If they're making a new article, give its text, truncated, in the summary.
+				$truncatedtext = $newContent->getTextForSummary(
+					200 - strlen( wfMessage( 'autosumm-new' )->inContentLanguage()->text() ) );
+
+				return wfMessage( 'autosumm-new' )->rawParams( $truncatedtext )
+					->inContentLanguage()->text();
+			case 'blank':
+				return wfMessage( 'autosumm-blank' )->inContentLanguage()->text();
+			case 'replace':
+				$truncatedtext = $newContent->getTextForSummary(
+					200 - strlen( wfMessage( 'autosumm-replace' )->inContentLanguage()->text() ) );
+
+				return wfMessage( 'autosumm-replace' )->rawParams( $truncatedtext )
+					->inContentLanguage()->text();
+			case 'newblank':
+				return wfMessage( 'autosumm-newblank' )->inContentLanguage()->text();
+			default:
+				return '';
+		}
+	}
+
+	/**
+	 * Return an applicable tag if one exists for the given edit or return null.
+	 *
+	 * @since 1.31
+	 *
+	 * @param Content|null $oldContent The previous text of the page.
+	 * @param Content|null $newContent The submitted text of the page.
+	 * @param int $flags Bit mask: a bit mask of flags submitted for the edit.
+	 *
+	 * @return string|null An appropriate tag, or null.
+	 */
+	public function getChangeTag(
+		Content $oldContent = null,
+		Content $newContent = null,
+		$flags = 0
+	) {
+		$changeType = $this->getChangeType( $oldContent, $newContent, $flags );
+
+		// There's no applicable tag for this change.
+		if ( !$changeType ) {
+			return null;
 		}
 
-		// New page auto-summaries
-		if ( $flags & EDIT_NEW && $newContent->getSize() > 0 ) {
-			// If they're making a new article, give its text, truncated, in
-			// the summary.
+		// Core tags use the same keys as ones returned from $this->getChangeType()
+		// but prefixed with pseudo namespace 'mw-', so we add the prefix before checking
+		// if this type of change should be tagged
+		$tag = 'mw-' . $changeType;
 
-			$truncatedtext = $newContent->getTextForSummary(
-				200 - strlen( wfMessage( 'autosumm-new' )->inContentLanguage()->text() ) );
-
-			return wfMessage( 'autosumm-new' )->rawParams( $truncatedtext )
-				->inContentLanguage()->text();
+		// Not all change types are tagged, so we check against the list of defined tags.
+		if ( in_array( $tag, ChangeTags::getSoftwareTags() ) ) {
+			return $tag;
 		}
 
-		// Blanking auto-summaries
-		if ( !empty( $oldContent ) && $oldContent->getSize() > 0 && $newContent->getSize() == 0 ) {
-			return wfMessage( 'autosumm-blank' )->inContentLanguage()->text();
-		} elseif ( !empty( $oldContent )
-			&& $oldContent->getSize() > 10 * $newContent->getSize()
-			&& $newContent->getSize() < 500
-		) {
-			// Removing more than 90% of the article
-
-			$truncatedtext = $newContent->getTextForSummary(
-				200 - strlen( wfMessage( 'autosumm-replace' )->inContentLanguage()->text() ) );
-
-			return wfMessage( 'autosumm-replace' )->rawParams( $truncatedtext )
-				->inContentLanguage()->text();
-		}
-
-		// New blank article auto-summary
-		if ( $flags & EDIT_NEW && $newContent->isEmpty() ) {
-			return wfMessage( 'autosumm-newblank' )->inContentLanguage()->text();
-		}
-
-		// If we reach this point, there's no applicable auto-summary for our
-		// case, so our auto-summary is empty.
-		return '';
+		return null;
 	}
 
 	/**
@@ -878,13 +993,17 @@ abstract class ContentHandler {
 
 		// Find out if there was only one contributor
 		// Only scan the last 20 revisions
-		$res = $dbr->select( 'revision', 'rev_user_text',
+		$revQuery = Revision::getQueryInfo();
+		$res = $dbr->select(
+			$revQuery['tables'],
+			[ 'rev_user_text' => $revQuery['fields']['rev_user_text'] ],
 			[
 				'rev_page' => $title->getArticleID(),
 				$dbr->bitAnd( 'rev_deleted', Revision::DELETED_USER ) . ' = 0'
 			],
 			__METHOD__,
-			[ 'LIMIT' => 20 ]
+			[ 'LIMIT' => 20 ],
+			$revQuery['joins']
 		);
 
 		if ( $res === false ) {
@@ -1007,22 +1126,22 @@ abstract class ContentHandler {
 	 * @return ParserOptions
 	 */
 	public function makeParserOptions( $context ) {
-		global $wgContLang, $wgEnableParserLimitReporting;
+		global $wgContLang;
 
 		if ( $context instanceof IContextSource ) {
-			$options = ParserOptions::newFromContext( $context );
+			$user = $context->getUser();
+			$lang = $context->getLanguage();
 		} elseif ( $context instanceof User ) { // settings per user (even anons)
-			$options = ParserOptions::newFromUser( $context );
+			$user = $context;
+			$lang = null;
 		} elseif ( $context === 'canonical' ) { // canonical settings
-			$options = ParserOptions::newFromUserAndLang( new User, $wgContLang );
+			$user = new User;
+			$lang = $wgContLang;
 		} else {
 			throw new MWException( "Bad context for parser options: $context" );
 		}
 
-		$options->enableLimitReport( $wgEnableParserLimitReporting ); // show inclusion/loop reports
-		$options->setTidy( true ); // fix bad HTML
-
-		return $options;
+		return ParserOptions::newCanonical( $user, $lang );
 	}
 
 	/**
@@ -1134,10 +1253,10 @@ abstract class ContentHandler {
 
 	/**
 	 * Add new field definition to array.
-	 * @param SearchIndexField[] $fields
-	 * @param SearchEngine       $engine
-	 * @param string             $name
-	 * @param int                $type
+	 * @param SearchIndexField[] &$fields
+	 * @param SearchEngine $engine
+	 * @param string $name
+	 * @param int $type
 	 * @return SearchIndexField[] new field defs
 	 * @since 1.28
 	 */
@@ -1151,7 +1270,7 @@ abstract class ContentHandler {
 	 * as representation of this document.
 	 * Overriding class should call parent function or take care of calling
 	 * the SearchDataForIndex hook.
-	 * @param WikiPage     $page Page to index
+	 * @param WikiPage $page Page to index
 	 * @param ParserOutput $output
 	 * @param SearchEngine $engine Search engine for which we are indexing
 	 * @return array Map of name=>value for fields
@@ -1190,7 +1309,7 @@ abstract class ContentHandler {
 	 *
 	 * Specific content handlers may override it if they need different content handling.
 	 *
-	 * @param WikiPage    $page
+	 * @param WikiPage $page
 	 * @param ParserCache $cache
 	 * @return ParserOutput
 	 */

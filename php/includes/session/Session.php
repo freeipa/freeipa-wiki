@@ -621,31 +621,37 @@ final class Session implements \Countable, \Iterator, \ArrayAccess {
 	 * @{
 	 */
 
+	/** @inheritDoc */
 	public function count() {
 		$data = &$this->backend->getData();
 		return count( $data );
 	}
 
+	/** @inheritDoc */
 	public function current() {
 		$data = &$this->backend->getData();
 		return current( $data );
 	}
 
+	/** @inheritDoc */
 	public function key() {
 		$data = &$this->backend->getData();
 		return key( $data );
 	}
 
+	/** @inheritDoc */
 	public function next() {
 		$data = &$this->backend->getData();
 		next( $data );
 	}
 
+	/** @inheritDoc */
 	public function rewind() {
 		$data = &$this->backend->getData();
 		reset( $data );
 	}
 
+	/** @inheritDoc */
 	public function valid() {
 		$data = &$this->backend->getData();
 		return key( $data ) !== null;
@@ -654,6 +660,7 @@ final class Session implements \Countable, \Iterator, \ArrayAccess {
 	/**
 	 * @note Despite the name, this seems to be intended to implement isset()
 	 *  rather than array_key_exists(). So do that.
+	 * @inheritDoc
 	 */
 	public function offsetExists( $offset ) {
 		$data = &$this->backend->getData();
@@ -666,6 +673,7 @@ final class Session implements \Countable, \Iterator, \ArrayAccess {
 	 *  data to detect such changes.
 	 * @note Accessing a nonexistent key via this mechanism causes that key to
 	 *  be created with a null value, and does not raise a PHP warning.
+	 * @inheritDoc
 	 */
 	public function &offsetGet( $offset ) {
 		$data = &$this->backend->getData();
@@ -676,10 +684,12 @@ final class Session implements \Countable, \Iterator, \ArrayAccess {
 		return $data[$offset];
 	}
 
+	/** @inheritDoc */
 	public function offsetSet( $offset, $value ) {
 		$this->set( $offset, $value );
 	}
 
+	/** @inheritDoc */
 	public function offsetUnset( $offset ) {
 		$this->remove( $offset );
 	}

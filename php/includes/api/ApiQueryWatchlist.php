@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on Sep 25, 2006
- *
  * Copyright © 2006 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,6 +30,9 @@ use MediaWiki\MediaWikiServices;
  */
 class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 
+	/** @var CommentStore */
+	private $commentStore;
+
 	public function __construct( ApiQuery $query, $moduleName ) {
 		parent::__construct( $query, $moduleName, 'wl' );
 	}
@@ -50,7 +49,7 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 		$fld_flags = false, $fld_timestamp = false, $fld_user = false,
 		$fld_comment = false, $fld_parsedcomment = false, $fld_sizes = false,
 		$fld_notificationtimestamp = false, $fld_userid = false,
-		$fld_loginfo = false;
+		$fld_loginfo = false, $fld_tags;
 
 	/**
 	 * @param ApiPageSet $resultPageSet
@@ -79,11 +78,16 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 			$this->fld_patrol = isset( $prop['patrol'] );
 			$this->fld_notificationtimestamp = isset( $prop['notificationtimestamp'] );
 			$this->fld_loginfo = isset( $prop['loginfo'] );
+			$this->fld_tags = isset( $prop['tags'] );
 
 			if ( $this->fld_patrol ) {
 				if ( !$user->useRCPatrol() && !$user->useNPPatrol() ) {
 					$this->dieWithError( 'apierror-permissiondenied-patrolflag', 'patrol' );
 				}
+			}
+
+			if ( $this->fld_comment || $this->fld_parsedcomment ) {
+				$this->commentStore = CommentStore::getStore();
 			}
 		}
 
@@ -179,7 +183,7 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 		$watchedItemQuery = MediaWikiServices::getInstance()->getWatchedItemQueryService();
 		$items = $watchedItemQuery->getWatchedItemsWithRecentChangeInfo( $wlowner, $options, $startFrom );
 
-		foreach ( $items as list ( $watchedItem, $recentChangeInfo ) ) {
+		foreach ( $items as list( $watchedItem, $recentChangeInfo ) ) {
 			/** @var WatchedItem $watchedItem */
 			if ( is_null( $resultPageSet ) ) {
 				$vals = $this->extractOutputData( $watchedItem, $recentChangeInfo );
@@ -229,12 +233,16 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 		}
 		if ( $this->fld_patrol ) {
 			$includeFields[] = WatchedItemQueryService::INCLUDE_PATROL_INFO;
+			$includeFields[] = WatchedItemQueryService::INCLUDE_AUTOPATROL_INFO;
 		}
 		if ( $this->fld_sizes ) {
 			$includeFields[] = WatchedItemQueryService::INCLUDE_SIZES;
 		}
 		if ( $this->fld_loginfo ) {
 			$includeFields[] = WatchedItemQueryService::INCLUDE_LOG_INFO;
+		}
+		if ( $this->fld_tags ) {
+			$includeFields[] = WatchedItemQueryService::INCLUDE_TAGS;
 		}
 		return $includeFields;
 	}
@@ -248,16 +256,17 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 			&& isset( $show[WatchedItemQueryService::FILTER_NOT_ANON] ) )
 		|| ( isset( $show[WatchedItemQueryService::FILTER_PATROLLED] )
 			&& isset( $show[WatchedItemQueryService::FILTER_NOT_PATROLLED] ) )
+		|| ( isset( $show[WatchedItemQueryService::FILTER_AUTOPATROLLED] )
+			&& isset( $show[WatchedItemQueryService::FILTER_NOT_AUTOPATROLLED] ) )
+		|| ( isset( $show[WatchedItemQueryService::FILTER_AUTOPATROLLED] )
+			&& isset( $show[WatchedItemQueryService::FILTER_NOT_PATROLLED] ) )
 		|| ( isset( $show[WatchedItemQueryService::FILTER_UNREAD] )
 			&& isset( $show[WatchedItemQueryService::FILTER_NOT_UNREAD] ) );
 	}
 
 	private function extractOutputData( WatchedItem $watchedItem, array $recentChangeInfo ) {
 		/* Determine the title of the page that has been changed. */
-		$title = Title::makeTitle(
-			$watchedItem->getLinkTarget()->getNamespace(),
-			$watchedItem->getLinkTarget()->getDBkey()
-		);
+		$title = Title::newFromLinkTarget( $watchedItem->getLinkTarget() );
 		$user = $this->getUser();
 
 		/* Our output data. */
@@ -353,20 +362,22 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 				Revision::DELETED_COMMENT,
 				$user
 			) ) {
-				if ( $this->fld_comment && isset( $recentChangeInfo['rc_comment'] ) ) {
-					$vals['comment'] = $recentChangeInfo['rc_comment'];
+				$comment = $this->commentStore->getComment( 'rc_comment', $recentChangeInfo )->text;
+				if ( $this->fld_comment ) {
+					$vals['comment'] = $comment;
 				}
 
-				if ( $this->fld_parsedcomment && isset( $recentChangeInfo['rc_comment'] ) ) {
-					$vals['parsedcomment'] = Linker::formatComment( $recentChangeInfo['rc_comment'], $title );
+				if ( $this->fld_parsedcomment ) {
+					$vals['parsedcomment'] = Linker::formatComment( $comment, $title );
 				}
 			}
 		}
 
 		/* Add the patrolled flag */
 		if ( $this->fld_patrol ) {
-			$vals['patrolled'] = $recentChangeInfo['rc_patrolled'] == 1;
+			$vals['patrolled'] = $recentChangeInfo['rc_patrolled'] != RecentChange::PRC_UNPATROLLED;
 			$vals['unpatrolled'] = ChangesList::isUnpatrolled( (object)$recentChangeInfo, $user );
+			$vals['autopatrolled'] = $recentChangeInfo['rc_patrolled'] == RecentChange::PRC_AUTOPATROLLED;
 		}
 
 		if ( $this->fld_loginfo && $recentChangeInfo['rc_type'] == RC_LOG ) {
@@ -383,6 +394,16 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 				$vals['logtype'] = $recentChangeInfo['rc_log_type'];
 				$vals['logaction'] = $recentChangeInfo['rc_log_action'];
 				$vals['logparams'] = LogFormatter::newFromRow( $recentChangeInfo )->formatParametersForApi();
+			}
+		}
+
+		if ( $this->fld_tags ) {
+			if ( $recentChangeInfo['rc_tags'] ) {
+				$tags = explode( ',', $recentChangeInfo['rc_tags'] );
+				ApiResult::setIndexedTagName( $tags, 'tag' );
+				$vals['tags'] = $tags;
+			} else {
+				$vals['tags'] = [];
 			}
 		}
 
@@ -448,6 +469,7 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 					'sizes',
 					'notificationtimestamp',
 					'loginfo',
+					'tags',
 				]
 			],
 			'show' => [
@@ -461,6 +483,8 @@ class ApiQueryWatchlist extends ApiQueryGeneratorBase {
 					WatchedItemQueryService::FILTER_NOT_ANON,
 					WatchedItemQueryService::FILTER_PATROLLED,
 					WatchedItemQueryService::FILTER_NOT_PATROLLED,
+					WatchedItemQueryService::FILTER_AUTOPATROLLED,
+					WatchedItemQueryService::FILTER_NOT_AUTOPATROLLED,
 					WatchedItemQueryService::FILTER_UNREAD,
 					WatchedItemQueryService::FILTER_NOT_UNREAD,
 				]

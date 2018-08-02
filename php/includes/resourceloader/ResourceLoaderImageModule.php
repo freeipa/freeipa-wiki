@@ -249,7 +249,7 @@ class ResourceLoaderImageModule extends ResourceLoaderModule {
 				$fileDescriptor = is_string( $options ) ? $options : $options['file'];
 
 				$allowedVariants = array_merge(
-					is_array( $options ) && isset( $options['variants'] ) ? $options['variants'] : [],
+					( is_array( $options ) && isset( $options['variants'] ) ) ? $options['variants'] : [],
 					$this->getGlobalVariants( $context )
 				);
 				if ( isset( $this->variants[$skin] ) ) {
@@ -381,11 +381,11 @@ class ResourceLoaderImageModule extends ResourceLoaderModule {
 	 * @return string[] CSS declarations to use given URIs as background-image
 	 */
 	protected function getCssDeclarations( $primary, $fallback ) {
+		$primaryUrl = CSSMin::buildUrlValue( $primary );
+		$fallbackUrl = CSSMin::buildUrlValue( $fallback );
 		return [
-			"background-image: url($fallback);",
-			"background-image: linear-gradient(transparent, transparent), url($primary);",
-			// Do not serve SVG to Opera 12, bad rendering with border-radius or background-size (T87504)
-			"background-image: -o-linear-gradient(transparent, transparent), url($fallback);",
+			"background-image: $fallbackUrl;",
+			"background-image: linear-gradient(transparent, transparent), $primaryUrl;",
 		];
 	}
 
@@ -427,6 +427,8 @@ class ResourceLoaderImageModule extends ResourceLoaderModule {
 
 	/**
 	 * Helper method for getDefinitionSummary.
+	 * @param ResourceLoaderContext $context
+	 * @return array
 	 */
 	protected function getFileHashes( ResourceLoaderContext $context ) {
 		$this->loadFromDefinition();

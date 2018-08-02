@@ -70,19 +70,19 @@ class RefreshLinks extends Maintenance {
 		if ( ( $category = $this->getOption( 'category', false ) ) !== false ) {
 			$title = Title::makeTitleSafe( NS_CATEGORY, $category );
 			if ( !$title ) {
-				$this->error( "'$category' is an invalid category name!\n", true );
+				$this->fatalError( "'$category' is an invalid category name!\n" );
 			}
 			$this->refreshCategory( $title );
 		} elseif ( ( $category = $this->getOption( 'tracking-category', false ) ) !== false ) {
 			$this->refreshTrackingCategory( $category );
 		} elseif ( !$this->hasOption( 'dfn-only' ) ) {
-			$new = $this->getOption( 'new-only', false );
-			$redir = $this->getOption( 'redirects-only', false );
-			$oldRedir = $this->getOption( 'old-redirects-only', false );
+			$new = $this->hasOption( 'new-only' );
+			$redir = $this->hasOption( 'redirects-only' );
+			$oldRedir = $this->hasOption( 'old-redirects-only' );
 			$this->doRefreshLinks( $start, $new, $end, $redir, $oldRedir );
-			$this->deleteLinksFromNonexistent( null, null, $this->mBatchSize, $dfnChunkSize );
+			$this->deleteLinksFromNonexistent( null, null, $this->getBatchSize(), $dfnChunkSize );
 		} else {
-			$this->deleteLinksFromNonexistent( $start, $end, $this->mBatchSize, $dfnChunkSize );
+			$this->deleteLinksFromNonexistent( $start, $end, $this->getBatchSize(), $dfnChunkSize );
 		}
 	}
 
@@ -170,15 +170,14 @@ class RefreshLinks extends Maintenance {
 			}
 		} else {
 			if ( !$end ) {
-				$maxPage = $dbr->selectField( 'page', 'max(page_id)', false );
-				$maxRD = $dbr->selectField( 'redirect', 'max(rd_from)', false );
+				$maxPage = $dbr->selectField( 'page', 'max(page_id)', '', __METHOD__ );
+				$maxRD = $dbr->selectField( 'redirect', 'max(rd_from)', '', __METHOD__ );
 				$end = max( $maxPage, $maxRD );
 			}
 			$this->output( "Refreshing redirects table.\n" );
 			$this->output( "Starting from page_id $start of $end.\n" );
 
 			for ( $id = $start; $id <= $end; $id++ ) {
-
 				if ( !( $id % self::REPORTING_INTERVAL ) ) {
 					$this->output( "$id\n" );
 					wfWaitForSlaves();
@@ -191,7 +190,6 @@ class RefreshLinks extends Maintenance {
 				$this->output( "Starting from page_id $start of $end.\n" );
 
 				for ( $id = $start; $id <= $end; $id++ ) {
-
 					if ( !( $id % self::REPORTING_INTERVAL ) ) {
 						$this->output( "$id\n" );
 						wfWaitForSlaves();
@@ -450,7 +448,7 @@ class RefreshLinks extends Maintenance {
 		do {
 			$finalConds = $conds;
 			$timestamp = $dbr->addQuotes( $timestamp );
-			$finalConds []=
+			$finalConds [] =
 				"(cl_timestamp > $timestamp OR (cl_timestamp = $timestamp AND cl_from > $lastId))";
 			$res = $dbr->select( [ 'page', 'categorylinks' ],
 				[ 'page_id', 'cl_timestamp' ],
@@ -458,7 +456,7 @@ class RefreshLinks extends Maintenance {
 				__METHOD__,
 				[
 					'ORDER BY' => [ 'cl_timestamp', 'cl_from' ],
-					'LIMIT' => $this->mBatchSize,
+					'LIMIT' => $this->getBatchSize(),
 				]
 			);
 
@@ -472,7 +470,7 @@ class RefreshLinks extends Maintenance {
 				self::fixLinksFromArticle( $row->page_id );
 			}
 
-		} while ( $res->numRows() == $this->mBatchSize );
+		} while ( $res->numRows() == $this->getBatchSize() );
 	}
 
 	/**
@@ -487,9 +485,9 @@ class RefreshLinks extends Maintenance {
 		if ( isset( $cats[$categoryKey] ) ) {
 			return $cats[$categoryKey]['cats'];
 		}
-		$this->error( "Unknown tracking category {$categoryKey}\n", true );
+		$this->fatalError( "Unknown tracking category {$categoryKey}\n" );
 	}
 }
 
-$maintClass = 'RefreshLinks';
+$maintClass = RefreshLinks::class;
 require_once RUN_MAINTENANCE_IF_MAIN;

@@ -28,6 +28,27 @@
  */
 class LanguageCode {
 	/**
+	 * Mapping of deprecated language codes that were used in previous
+	 * versions of MediaWiki to up-to-date, current language codes.
+	 *
+	 * @var array Mapping from language code to language code
+	 *
+	 * @since 1.30
+	 */
+	private static $deprecatedLanguageCodeMapping = [
+		// Note that als is actually a valid ISO 639 code (Tosk Albanian), but it
+		// was previously used in MediaWiki for Alsatian, which comes under gsw
+		'als' => 'gsw',
+		'bat-smg' => 'sgs',
+		'be-x-old' => 'be-tarask',
+		'fiu-vro' => 'vro',
+		'roa-rup' => 'rup',
+		'zh-classical' => 'lzh',
+		'zh-min-nan' => 'nan',
+		'zh-yue' => 'yue',
+	];
+
+	/**
 	 * Returns a mapping of deprecated language codes that were used in previous
 	 * versions of MediaWiki to up-to-date, current language codes.
 	 *
@@ -36,19 +57,59 @@ class LanguageCode {
 	 * MediaWiki's localisation system.
 	 *
 	 * @return string[]
+	 *
+	 * @since 1.29
 	 */
 	public static function getDeprecatedCodeMapping() {
-		return [
-			// Note that als is actually a valid ISO 639 code (Tosk Albanian), but it
-			// was previously used in MediaWiki for Alsatian, which comes under gsw
-			'als' => 'gsw',
-			'bat-smg' => 'sgs',
-			'be-x-old' => 'be-tarask',
-			'fiu-vro' => 'vro',
-			'roa-rup' => 'rup',
-			'zh-classical' => 'lzh',
-			'zh-min-nan' => 'nan',
-			'zh-yue' => 'yue',
-		];
+		return self::$deprecatedLanguageCodeMapping;
+	}
+
+	/**
+	 * Replace deprecated language codes that were used in previous
+	 * versions of MediaWiki to up-to-date, current language codes.
+	 * Other values will returned unchanged.
+	 *
+	 * @param string $code Old language code
+	 * @return string New language code
+	 *
+	 * @since 1.30
+	 */
+	public static function replaceDeprecatedCodes( $code ) {
+		if ( isset( self::$deprecatedLanguageCodeMapping[$code] ) ) {
+			return self::$deprecatedLanguageCodeMapping[$code];
+		}
+		return $code;
+	}
+
+	/**
+	 * Get the normalised IETF language tag
+	 * See unit test for examples.
+	 * See mediawiki.language.bcp47 for the JavaScript implementation.
+	 *
+	 * @param string $code The language code.
+	 * @return string The language code which complying with BCP 47 standards.
+	 *
+	 * @since 1.31
+	 */
+	public static function bcp47( $code ) {
+		$codeSegment = explode( '-', $code );
+		$codeBCP = [];
+		foreach ( $codeSegment as $segNo => $seg ) {
+			// when previous segment is x, it is a private segment and should be lc
+			if ( $segNo > 0 && strtolower( $codeSegment[( $segNo - 1 )] ) == 'x' ) {
+				$codeBCP[$segNo] = strtolower( $seg );
+			// ISO 3166 country code
+			} elseif ( ( strlen( $seg ) == 2 ) && ( $segNo > 0 ) ) {
+				$codeBCP[$segNo] = strtoupper( $seg );
+			// ISO 15924 script code
+			} elseif ( ( strlen( $seg ) == 4 ) && ( $segNo > 0 ) ) {
+				$codeBCP[$segNo] = ucfirst( strtolower( $seg ) );
+			// Use lowercase for other cases
+			} else {
+				$codeBCP[$segNo] = strtolower( $seg );
+			}
+		}
+		$langCode = implode( '-', $codeBCP );
+		return $langCode;
 	}
 }

@@ -113,8 +113,7 @@
 					} )
 				);
 			}
-		).then(
-			null,
+		).catch(
 			// Always resolve, never reject
 			function () { return $.Deferred().resolve(); }
 		);
@@ -236,10 +235,9 @@
 			required: true,
 			validate: /.+/
 		} );
-		this.descriptionWidget = new OO.ui.TextInputWidget( {
+		this.descriptionWidget = new OO.ui.MultilineTextInputWidget( {
 			required: true,
 			validate: /\S+/,
-			multiline: true,
 			autosize: true
 		} );
 		this.categoriesWidget = new mw.widgets.CategoryMultiselectWidget( {
@@ -357,9 +355,9 @@
 	 */
 	mw.ForeignStructuredUpload.BookletLayout.prototype.saveFile = function () {
 		var title = mw.Title.newFromText(
-				this.getFilename(),
-				mw.config.get( 'wgNamespaceIds' ).file
-			);
+			this.getFilename(),
+			mw.config.get( 'wgNamespaceIds' ).file
+		);
 
 		return this.uploadPromise
 			.then( this.validateFilename.bind( this, title ) )
@@ -394,7 +392,8 @@
 		if ( file && file.type === 'image/jpeg' ) {
 			fileReader = new FileReader();
 			fileReader.onload = function () {
-				var fileStr, arr, i, metadata;
+				var fileStr, arr, i, metadata,
+					jpegmeta = mw.loader.require( 'mediawiki.libs.jpegmeta' );
 
 				if ( typeof fileReader.result === 'string' ) {
 					fileStr = fileReader.result;
@@ -408,7 +407,7 @@
 				}
 
 				try {
-					metadata = mw.libs.jpegmeta( fileStr, file.name );
+					metadata = jpegmeta( fileStr, file.name );
 				} catch ( e ) {
 					metadata = null;
 				}

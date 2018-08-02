@@ -92,8 +92,11 @@ class DeleteOrphanedRevisions extends Maintenance {
 			$id = [ $id ];
 		}
 		$dbw->delete( 'revision', [ 'rev_id' => $id ], __METHOD__ );
+
+		// Delete from ip_changes should a record exist.
+		$dbw->delete( 'ip_changes', [ 'ipc_rev_id' => $id ], __METHOD__ );
 	}
 }
 
-$maintClass = "DeleteOrphanedRevisions";
+$maintClass = DeleteOrphanedRevisions::class;
 require_once RUN_MAINTENANCE_IF_MAIN;

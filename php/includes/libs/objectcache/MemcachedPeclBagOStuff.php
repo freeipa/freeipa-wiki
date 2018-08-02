@@ -29,8 +29,6 @@
 class MemcachedPeclBagOStuff extends MemcachedBagOStuff {
 
 	/**
-	 * Constructor
-	 *
 	 * Available parameters are:
 	 *   - servers:             The list of IP:port combinations holding the memcached servers.
 	 *   - persistent:          Whether to use a persistent connection
@@ -142,14 +140,31 @@ class MemcachedPeclBagOStuff extends MemcachedBagOStuff {
 
 	protected function getWithToken( $key, &$casToken, $flags = 0 ) {
 		$this->debugLog( "get($key)" );
-		$result = $this->client->get( $this->validateKeyEncoding( $key ), null, $casToken );
+		if ( defined( Memcached::class . '::GET_EXTENDED' ) ) { // v3.0.0
+			$flags = Memcached::GET_EXTENDED;
+			$res = $this->client->get( $this->validateKeyEncoding( $key ), null, $flags );
+			if ( is_array( $res ) ) {
+				$result = $res['value'];
+				$casToken = $res['cas'];
+			} else {
+				$result = false;
+				$casToken = null;
+			}
+		} else {
+			$result = $this->client->get( $this->validateKeyEncoding( $key ), null, $casToken );
+		}
 		$result = $this->checkResult( $key, $result );
 		return $result;
 	}
 
 	public function set( $key, $value, $exptime = 0, $flags = 0 ) {
 		$this->debugLog( "set($key)" );
-		return $this->checkResult( $key, parent::set( $key, $value, $exptime ) );
+		$result = parent::set( $key, $value, $exptime );
+		if ( $result === false && $this->client->getResultCode() === Memcached::RES_NOTSTORED ) {
+			// "Not stored" is always used as the mcrouter response with AllAsyncRoute
+			return true;
+		}
+		return $this->checkResult( $key, $result );
 	}
 
 	protected function cas( $casToken, $key, $value, $exptime = 0 ) {
@@ -163,9 +178,8 @@ class MemcachedPeclBagOStuff extends MemcachedBagOStuff {
 		if ( $result === false && $this->client->getResultCode() === Memcached::RES_NOTFOUND ) {
 			// "Not found" is counted as success in our interface
 			return true;
-		} else {
-			return $this->checkResult( $key, $result );
 		}
+		return $this->checkResult( $key, $result );
 	}
 
 	public function add( $key, $value, $exptime = 0 ) {

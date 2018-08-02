@@ -101,6 +101,33 @@ class MssqlUpdater extends DatabaseUpdater {
 			[ 'addField', 'externallinks', 'el_index_60', 'patch-externallinks-el_index_60.sql' ],
 			[ 'dropIndex', 'oldimage', 'oi_name_archive_name',
 				'patch-alter-table-oldimage.sql' ],
+
+			// 1.30
+			[ 'modifyField', 'image', 'img_media_type', 'patch-add-3d.sql' ],
+			[ 'addIndex', 'site_stats', 'PRIMARY', 'patch-site_stats-pk.sql' ],
+
+			// Should have been in 1.30
+			[ 'addTable', 'comment', 'patch-comment-table.sql' ],
+			// This field was added in 1.31, but is put here so it can be used by 'migrateComments'
+			[ 'addField', 'image', 'img_description_id', 'patch-image-img_description_id.sql' ],
+			// Should have been in 1.30
+			[ 'migrateComments' ],
+
+			// 1.31
+			[ 'addTable', 'slots', 'patch-slots.sql' ],
+			[ 'addField', 'slots', 'slot_origin', 'patch-slot-origin.sql' ],
+			[ 'addTable', 'content', 'patch-content.sql' ],
+			[ 'addTable', 'slot_roles', 'patch-slot_roles.sql' ],
+			[ 'addTable', 'content_models', 'patch-content_models.sql' ],
+			[ 'migrateArchiveText' ],
+			[ 'addTable', 'actor', 'patch-actor-table.sql' ],
+			[ 'migrateActors' ],
+			[ 'modifyField', 'revision', 'rev_text_id', 'patch-rev_text_id-default.sql' ],
+			[ 'modifyTable', 'site_stats', 'patch-site_stats-modify.sql' ],
+			[ 'populateArchiveRevId' ],
+			[ 'modifyField', 'recentchanges', 'rc_patrolled', 'patch-rc_patrolled_type.sql' ],
+			[ 'addIndex', 'recentchanges', 'rc_namespace_title_timestamp',
+				'patch-recentchanges-nttindex.sql' ],
 		];
 	}
 
@@ -114,12 +141,15 @@ class MssqlUpdater extends DatabaseUpdater {
 
 	/**
 	 * General schema update for a table that touches more than one field or requires
-	 * destructive actions (such as dropping and recreating the table).
+	 * destructive actions (such as dropping and recreating the table). NOTE: Usage of
+	 * this function is highly discouraged, use it's successor DatabaseUpdater::modifyTable
+	 * instead.
 	 *
 	 * @param string $table
 	 * @param string $updatekey
 	 * @param string $patch
 	 * @param bool $fullpath
+	 * @return bool
 	 */
 	protected function updateSchema( $table, $updatekey, $patch, $fullpath = false ) {
 		if ( !$this->db->tableExists( $table, __METHOD__ ) ) {
@@ -127,9 +157,11 @@ class MssqlUpdater extends DatabaseUpdater {
 		} elseif ( $this->updateRowExists( $updatekey ) ) {
 			$this->output( "...$table already had schema updated by $patch.\n" );
 		} else {
-			$this->insertUpdateRow( $updatekey );
-
-			return $this->applyPatch( $patch, $fullpath, "Updating schema of table $table" );
+			$apply = $this->applyPatch( $patch, $fullpath, "Updating schema of table $table" );
+			if ( $apply ) {
+				$this->insertUpdateRow( $updatekey );
+			}
+			return $apply;
 		}
 
 		return true;

@@ -44,7 +44,7 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 	}
 
 	public function getDescription() {
-		$target = self::getTarget( $this->mTarget );
+		$target = self::getTarget( $this->mTarget, $this->getUser() );
 		if ( !$target instanceof User ) {
 			return $this->msg( 'emailuser-title-notarget' )->text();
 		}
@@ -142,7 +142,7 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 				throw new ErrorPageError( $title, $msg, $params );
 		}
 		// Got a valid target user name? Else ask for one.
-		$ret = self::getTarget( $this->mTarget );
+		$ret = self::getTarget( $this->mTarget, $this->getUser() );
 		if ( !$ret instanceof User ) {
 			if ( $this->mTarget != '' ) {
 				// Messages used here: notargettext, noemailtext, nowikiemailtext
@@ -187,9 +187,14 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 	 * Validate target User
 	 *
 	 * @param string $target Target user name
-	 * @return User User object on success or a string on error
+	 * @param User|null $sender User sending the email
+	 * @return User|string User object on success or a string on error
 	 */
-	public static function getTarget( $target ) {
+	public static function getTarget( $target, User $sender = null ) {
+		if ( $sender === null ) {
+			wfDeprecated( __METHOD__ . ' without specifying the sending user', '1.30' );
+		}
+
 		if ( $target == '' ) {
 			wfDebug( "Target is empty.\n" );
 
@@ -197,21 +202,64 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 		}
 
 		$nu = User::newFromName( $target );
-		if ( !$nu instanceof User || !$nu->getId() ) {
+		$error = self::validateTarget( $nu, $sender );
+
+		return $error ? $error : $nu;
+	}
+
+	/**
+	 * Validate target User
+	 *
+	 * @param User $target Target user
+	 * @param User|null $sender User sending the email
+	 * @return string Error message or empty string if valid.
+	 * @since 1.30
+	 */
+	public static function validateTarget( $target, User $sender = null ) {
+		if ( $sender === null ) {
+			wfDeprecated( __METHOD__ . ' without specifying the sending user', '1.30' );
+		}
+
+		if ( !$target instanceof User || !$target->getId() ) {
 			wfDebug( "Target is invalid user.\n" );
 
 			return 'notarget';
-		} elseif ( !$nu->isEmailConfirmed() ) {
+		}
+
+		if ( !$target->isEmailConfirmed() ) {
 			wfDebug( "User has no valid email.\n" );
 
 			return 'noemail';
-		} elseif ( !$nu->canReceiveEmail() ) {
+		}
+
+		if ( !$target->canReceiveEmail() ) {
 			wfDebug( "User does not allow user emails.\n" );
 
 			return 'nowikiemail';
 		}
 
-		return $nu;
+		if ( $sender !== null && !$target->getOption( 'email-allow-new-users' ) &&
+			$sender->isNewbie()
+		) {
+			wfDebug( "User does not allow user emails from new users.\n" );
+
+			return 'nowikiemail';
+		}
+
+		if ( $sender !== null ) {
+			$blacklist = $target->getOption( 'email-blacklist', [] );
+			if ( $blacklist ) {
+				$lookup = CentralIdLookup::factory();
+				$senderId = $lookup->centralIdFromLocalUser( $sender );
+				if ( $senderId !== 0 && in_array( $senderId, $blacklist ) ) {
+					wfDebug( "User does not allow user emails from this user.\n" );
+
+					return 'nowikiemail';
+				}
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -246,7 +294,9 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 			return "blockedemailuser";
 		}
 
-		if ( $user->pingLimiter( 'emailuser' ) ) {
+		// Check the ping limiter without incrementing it - we'll check it
+		// again later and increment it on a successful send
+		if ( $user->pingLimiter( 'emailuser', 0 ) ) {
 			wfDebug( "Ping limiter triggered.\n" );
 
 			return 'actionthrottledtext';
@@ -326,7 +376,7 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 	public static function submit( array $data, IContextSource $context ) {
 		$config = $context->getConfig();
 
-		$target = self::getTarget( $data['Target'] );
+		$target = self::getTarget( $data['Target'], $context->getUser() );
 		if ( !$target instanceof User ) {
 			// Messages used here: notargettext, noemailtext, nowikiemailtext
 			return Status::newFatal( $target . 'text' );
@@ -341,6 +391,11 @@ class SpecialEmailUser extends UnlistedSpecialPage {
 		$text = rtrim( $text ) . "\n\n-- \n";
 		$text .= $context->msg( 'emailuserfooter',
 			$from->name, $to->name )->inContentLanguage()->text();
+
+		// Check and increment the rate limits
+		if ( $context->getUser()->pingLimiter( 'emailuser' ) ) {
+			throw new ThrottledError();
+		}
 
 		$error = false;
 		if ( !Hooks::run( 'EmailUser', [ &$to, &$from, &$subject, &$text, &$error ] ) ) {

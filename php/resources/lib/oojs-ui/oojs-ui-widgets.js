@@ -1,12 +1,12 @@
 /*!
- * OOjs UI v0.21.1
- * https://www.mediawiki.org/wiki/OOjs_UI
+ * OOUI v0.26.4
+ * https://www.mediawiki.org/wiki/OOUI
  *
- * Copyright 2011–2017 OOjs UI Team and other contributors.
+ * Copyright 2011–2018 OOUI Team and other contributors.
  * Released under the MIT license
  * http://oojs.mit-license.org
  *
- * Date: 2017-04-18T23:32:49Z
+ * Date: 2018-04-17T22:23:58Z
  */
 ( function ( OO ) {
 
@@ -35,14 +35,10 @@ OO.ui.mixin.DraggableElement = function OoUiMixinDraggableElement( config ) {
 	this.index = null;
 	this.$handle = config.$handle || this.$element;
 	this.wasHandleUsed = null;
-	this.draggable = config.draggable === undefined ? true : !!config.draggable;
 
 	// Initialize and events
-	this.$element.addClass( 'oo-ui-draggableElement' )
-		// We make the entire element draggable, not just the handle, so that
-		// the whole element appears to move. wasHandleUsed prevents drags from
-		// starting outside the handle
-		.attr( 'draggable', true )
+	this.$element
+		.addClass( 'oo-ui-draggableElement' )
 		.on( {
 			mousedown: this.onDragMouseDown.bind( this ),
 			dragstart: this.onDragStart.bind( this ),
@@ -51,6 +47,7 @@ OO.ui.mixin.DraggableElement = function OoUiMixinDraggableElement( config ) {
 			drop: this.onDrop.bind( this )
 		} );
 	this.$handle.addClass( 'oo-ui-draggableElement-handle' );
+	this.toggleDraggable( config.draggable === undefined ? true : !!config.draggable );
 };
 
 OO.initClass( OO.ui.mixin.DraggableElement );
@@ -99,6 +96,11 @@ OO.ui.mixin.DraggableElement.prototype.toggleDraggable = function ( isDraggable 
 		this.draggable = isDraggable;
 
 		this.$handle.toggleClass( 'oo-ui-draggableElement-undraggable', !this.draggable );
+
+		// We make the entire element draggable, not just the handle, so that
+		// the whole element appears to move. wasHandleUsed prevents drags from
+		// starting outside the handle
+		this.$element.prop( 'draggable', this.draggable );
 	}
 };
 
@@ -152,7 +154,7 @@ OO.ui.mixin.DraggableElement.prototype.onDragStart = function ( e ) {
 	// We must set up a dataTransfer data property or Firefox seems to
 	// ignore the fact the element is draggable.
 	try {
-		dataTransfer.setData( 'application-x/OOjs-UI-draggable', this.getIndex() );
+		dataTransfer.setData( 'application-x/OOUI-draggable', this.getIndex() );
 	} catch ( err ) {
 		// The above is only for Firefox. Move on if it fails.
 	}
@@ -277,8 +279,6 @@ OO.ui.mixin.DraggableGroupElement = function OoUiMixinDraggableGroupElement( con
 	}
 	this.$element
 		.addClass( 'oo-ui-draggableGroupElement' )
-		.attr( 'role', 'listbox' )
-		.append( this.$status )
 		.toggleClass( 'oo-ui-draggableGroupElement-horizontal', this.orientation === 'horizontal' );
 };
 
@@ -609,7 +609,7 @@ OO.ui.mixin.RequestManager.prototype.getRequest = null;
 OO.ui.mixin.RequestManager.prototype.getRequestCacheDataFromResponse = null;
 
 /**
- * LookupElement is a mixin that creates a {@link OO.ui.FloatingMenuSelectWidget menu} of suggested values for
+ * LookupElement is a mixin that creates a {@link OO.ui.MenuSelectWidget menu} of suggested values for
  * a {@link OO.ui.TextInputWidget text input widget}. Suggested values are based on the characters the user types
  * into the text input field and, in general, the menu is only displayed when the user types. If a suggested value is chosen
  * from the lookup menu, that value becomes the value of the input field.
@@ -618,9 +618,9 @@ OO.ui.mixin.RequestManager.prototype.getRequestCacheDataFromResponse = null;
  * not the desired behavior, disable lookup menus with the #setLookupsDisabled method, then set the value, then
  * re-enable lookups.
  *
- * See the [OOjs UI demos][1] for an example.
+ * See the [OOUI demos][1] for an example.
  *
- * [1]: https://tools.wmflabs.org/oojs-ui/oojs-ui/demos/index.html#widgets-apex-vector-ltr
+ * [1]: https://doc.wikimedia.org/oojs-ui/master/demos/#LookupElement-try-inputting-an-integer
  *
  * @class
  * @abstract
@@ -628,7 +628,8 @@ OO.ui.mixin.RequestManager.prototype.getRequestCacheDataFromResponse = null;
  *
  * @constructor
  * @param {Object} [config] Configuration options
- * @cfg {jQuery} [$overlay] Overlay for the lookup menu; defaults to relative positioning
+ * @cfg {jQuery} [$overlay] Overlay for the lookup menu; defaults to relative positioning.
+ *  See <https://www.mediawiki.org/wiki/OOUI/Concepts#Overlays>.
  * @cfg {jQuery} [$container=this.$element] The container element. The lookup menu is rendered beneath the specified element.
  * @cfg {boolean} [allowSuggestionsWhenEmpty=false] Request and display a lookup menu when the text input is empty.
  *  By default, the lookup menu is not generated and displayed until the user begins to type.
@@ -643,11 +644,11 @@ OO.ui.mixin.LookupElement = function OoUiMixinLookupElement( config ) {
 	OO.ui.mixin.RequestManager.call( this, config );
 
 	// Properties
-	this.$overlay = config.$overlay || this.$element;
-	this.lookupMenu = new OO.ui.FloatingMenuSelectWidget( {
+	this.$overlay = ( config.$overlay === true ? OO.ui.getDefaultOverlay() : config.$overlay ) || this.$element;
+	this.lookupMenu = new OO.ui.MenuSelectWidget( {
 		widget: this,
 		input: this,
-		$container: config.$container || this.$element
+		$floatableContainer: config.$container || this.$element
 	} );
 
 	this.allowSuggestionsWhenEmpty = config.allowSuggestionsWhenEmpty || false;
@@ -669,6 +670,11 @@ OO.ui.mixin.LookupElement = function OoUiMixinLookupElement( config ) {
 	} );
 
 	// Initialization
+	this.$input.attr( {
+		role: 'combobox',
+		'aria-owns': this.lookupMenu.getElementId(),
+		'aria-autocomplete': 'list'
+	} );
 	this.$element.addClass( 'oo-ui-lookupElement' );
 	this.lookupMenu.$element.addClass( 'oo-ui-lookupElement-menu' );
 	this.$overlay.append( this.lookupMenu.$element );
@@ -760,7 +766,7 @@ OO.ui.mixin.LookupElement.prototype.onLookupMenuItemChoose = function ( item ) {
  * Get lookup menu.
  *
  * @private
- * @return {OO.ui.FloatingMenuSelectWidget}
+ * @return {OO.ui.MenuSelectWidget}
  */
 OO.ui.mixin.LookupElement.prototype.getLookupMenu = function () {
 	return this.lookupMenu;
@@ -852,8 +858,8 @@ OO.ui.mixin.LookupElement.prototype.populateLookupMenu = function () {
  * @chainable
  */
 OO.ui.mixin.LookupElement.prototype.initializeLookupMenuSelection = function () {
-	if ( this.lookupHighlightFirstItem && !this.lookupMenu.getSelectedItem() ) {
-		this.lookupMenu.highlightItem( this.lookupMenu.getFirstSelectableItem() );
+	if ( this.lookupHighlightFirstItem && !this.lookupMenu.findSelectedItem() ) {
+		this.lookupMenu.highlightItem( this.lookupMenu.findFirstSelectableItem() );
 	}
 };
 
@@ -959,23 +965,24 @@ OO.ui.mixin.LookupElement.prototype.getRequestCacheDataFromResponse = function (
 };
 
 /**
- * CardLayouts are used within {@link OO.ui.IndexLayout index layouts} to create cards that users can select and display
- * from the index's optional {@link OO.ui.TabSelectWidget tab} navigation. Cards are usually not instantiated directly,
- * rather extended to include the required content and functionality.
+ * TabPanelLayouts are used within {@link OO.ui.IndexLayout index layouts} to create tab panels that
+ * users can select and display from the index's optional {@link OO.ui.TabSelectWidget tab}
+ * navigation. TabPanels are usually not instantiated directly, rather extended to include the
+ * required content and functionality.
  *
- * Each card must have a unique symbolic name, which is passed to the constructor. In addition, the card's tab
- * item is customized (with a label) using the #setupTabItem method. See
+ * Each tab panel must have a unique symbolic name, which is passed to the constructor. In addition,
+ * the tab panel's tab item is customized (with a label) using the #setupTabItem method. See
  * {@link OO.ui.IndexLayout IndexLayout} for an example.
  *
  * @class
  * @extends OO.ui.PanelLayout
  *
  * @constructor
- * @param {string} name Unique symbolic name of card
+ * @param {string} name Unique symbolic name of tab panel
  * @param {Object} [config] Configuration options
- * @cfg {jQuery|string|Function|OO.ui.HtmlSnippet} [label] Label for card's tab
+ * @cfg {jQuery|string|Function|OO.ui.HtmlSnippet} [label] Label for tab panel's tab
  */
-OO.ui.CardLayout = function OoUiCardLayout( name, config ) {
+OO.ui.TabPanelLayout = function OoUiTabPanelLayout( name, config ) {
 	// Allow passing positional parameters inside the config object
 	if ( OO.isPlainObject( name ) && config === undefined ) {
 		config = name;
@@ -986,7 +993,7 @@ OO.ui.CardLayout = function OoUiCardLayout( name, config ) {
 	config = $.extend( { scrollable: true }, config );
 
 	// Parent constructor
-	OO.ui.CardLayout.parent.call( this, config );
+	OO.ui.TabPanelLayout.parent.call( this, config );
 
 	// Properties
 	this.name = name;
@@ -995,55 +1002,56 @@ OO.ui.CardLayout = function OoUiCardLayout( name, config ) {
 	this.active = false;
 
 	// Initialization
-	this.$element.addClass( 'oo-ui-cardLayout' );
+	this.$element.addClass( 'oo-ui-tabPanelLayout' );
 };
 
 /* Setup */
 
-OO.inheritClass( OO.ui.CardLayout, OO.ui.PanelLayout );
+OO.inheritClass( OO.ui.TabPanelLayout, OO.ui.PanelLayout );
 
 /* Events */
 
 /**
- * An 'active' event is emitted when the card becomes active. Cards become active when they are
- * shown in a index layout that is configured to display only one card at a time.
+ * An 'active' event is emitted when the tab panel becomes active. Tab panels become active when they are
+ * shown in a index layout that is configured to display only one tab panel at a time.
  *
  * @event active
- * @param {boolean} active Card is active
+ * @param {boolean} active Tab panel is active
  */
 
 /* Methods */
 
 /**
- * Get the symbolic name of the card.
+ * Get the symbolic name of the tab panel.
  *
- * @return {string} Symbolic name of card
+ * @return {string} Symbolic name of tab panel
  */
-OO.ui.CardLayout.prototype.getName = function () {
+OO.ui.TabPanelLayout.prototype.getName = function () {
 	return this.name;
 };
 
 /**
- * Check if card is active.
+ * Check if tab panel is active.
  *
- * Cards become active when they are shown in a {@link OO.ui.IndexLayout index layout} that is configured to display
- * only one card at a time. Additional CSS is applied to the card's tab item to reflect the active state.
+ * Tab panels become active when they are shown in a {@link OO.ui.IndexLayout index layout} that is configured to
+ * display only one tab panel at a time. Additional CSS is applied to the tab panel's tab item to reflect the
+ * active state.
  *
- * @return {boolean} Card is active
+ * @return {boolean} Tab panel is active
  */
-OO.ui.CardLayout.prototype.isActive = function () {
+OO.ui.TabPanelLayout.prototype.isActive = function () {
 	return this.active;
 };
 
 /**
  * Get tab item.
  *
- * The tab item allows users to access the card from the index's tab
+ * The tab item allows users to access the tab panel from the index's tab
  * navigation. The tab item itself can be customized (with a label, level, etc.) using the #setupTabItem method.
  *
  * @return {OO.ui.TabOptionWidget|null} Tab option widget
  */
-OO.ui.CardLayout.prototype.getTabItem = function () {
+OO.ui.TabPanelLayout.prototype.getTabItem = function () {
 	return this.tabItem;
 };
 
@@ -1057,7 +1065,7 @@ OO.ui.CardLayout.prototype.getTabItem = function () {
  * @param {OO.ui.TabOptionWidget|null} tabItem Tab option widget, null to clear
  * @chainable
  */
-OO.ui.CardLayout.prototype.setTabItem = function ( tabItem ) {
+OO.ui.TabPanelLayout.prototype.setTabItem = function ( tabItem ) {
 	this.tabItem = tabItem || null;
 	if ( tabItem ) {
 		this.setupTabItem();
@@ -1075,7 +1083,7 @@ OO.ui.CardLayout.prototype.setTabItem = function ( tabItem ) {
  * @param {OO.ui.TabOptionWidget} tabItem Tab option widget to set up
  * @chainable
  */
-OO.ui.CardLayout.prototype.setupTabItem = function () {
+OO.ui.TabPanelLayout.prototype.setupTabItem = function () {
 	if ( this.label ) {
 		this.tabItem.setLabel( this.label );
 	}
@@ -1083,21 +1091,21 @@ OO.ui.CardLayout.prototype.setupTabItem = function () {
 };
 
 /**
- * Set the card to its 'active' state.
+ * Set the tab panel to its 'active' state.
  *
- * Cards become active when they are shown in a index layout that is configured to display only one card at a time. Additional
- * CSS is applied to the tab item to reflect the card's active state. Outside of the index
- * context, setting the active state on a card does nothing.
+ * Tab panels become active when they are shown in a index layout that is configured to display only
+ * one tab panel at a time. Additional CSS is applied to the tab item to reflect the tab panel's
+ * active state. Outside of the index context, setting the active state on a tab panel does nothing.
  *
- * @param {boolean} active Card is active
+ * @param {boolean} active Tab panel is active
  * @fires active
  */
-OO.ui.CardLayout.prototype.setActive = function ( active ) {
+OO.ui.TabPanelLayout.prototype.setActive = function ( active ) {
 	active = !!active;
 
 	if ( active !== this.active ) {
 		this.active = active;
-		this.$element.toggleClass( 'oo-ui-cardLayout-active', this.active );
+		this.$element.toggleClass( 'oo-ui-tabPanelLayout-active', this.active );
 		this.emit( 'active', this.active );
 	}
 };
@@ -1579,12 +1587,14 @@ OO.ui.StackLayout.prototype.updateHiddenState = function ( items, selectedItem )
  *
  * @constructor
  * @param {Object} [config] Configuration options
+ * @cfg {boolean} [expanded=true] Expand the layout to fill the entire parent element.
  * @cfg {boolean} [showMenu=true] Show menu
  * @cfg {string} [menuPosition='before'] Position of menu: `top`, `after`, `bottom` or `before`
  */
 OO.ui.MenuLayout = function OoUiMenuLayout( config ) {
 	// Configuration initialization
 	config = $.extend( {
+		expanded: true,
 		showMenu: true,
 		menuPosition: 'before'
 	}, config );
@@ -1592,6 +1602,7 @@ OO.ui.MenuLayout = function OoUiMenuLayout( config ) {
 	// Parent constructor
 	OO.ui.MenuLayout.parent.call( this, config );
 
+	this.expanded = !!config.expanded;
 	/**
 	 * Menu DOM node
 	 *
@@ -1610,8 +1621,12 @@ OO.ui.MenuLayout = function OoUiMenuLayout( config ) {
 		.addClass( 'oo-ui-menuLayout-menu' );
 	this.$content.addClass( 'oo-ui-menuLayout-content' );
 	this.$element
-		.addClass( 'oo-ui-menuLayout' )
-		.append( this.$content, this.$menu );
+		.addClass( 'oo-ui-menuLayout' );
+	if ( config.expanded ) {
+		this.$element.addClass( 'oo-ui-menuLayout-expanded' );
+	} else {
+		this.$element.addClass( 'oo-ui-menuLayout-static' );
+	}
 	this.setMenuPosition( config.menuPosition );
 	this.toggleMenu( config.showMenu );
 };
@@ -1661,6 +1676,11 @@ OO.ui.MenuLayout.prototype.isMenuVisible = function () {
 OO.ui.MenuLayout.prototype.setMenuPosition = function ( position ) {
 	this.$element.removeClass( 'oo-ui-menuLayout-' + this.menuPosition );
 	this.menuPosition = position;
+	if ( this.menuPosition === 'top' || this.menuPosition === 'before' ) {
+		this.$element.append( this.$menu, this.$content );
+	} else {
+		this.$element.append( this.$content, this.$menu );
+	}
 	this.$element.addClass( 'oo-ui-menuLayout-' + position );
 
 	return this;
@@ -1736,7 +1756,10 @@ OO.ui.BookletLayout = function OoUiBookletLayout( config ) {
 	this.currentPageName = null;
 	this.pages = {};
 	this.ignoreFocus = false;
-	this.stackLayout = new OO.ui.StackLayout( { continuous: !!config.continuous } );
+	this.stackLayout = new OO.ui.StackLayout( {
+		continuous: !!config.continuous,
+		expanded: this.expanded
+	} );
 	this.$content.append( this.stackLayout.$element );
 	this.autoFocus = config.autoFocus === undefined || !!config.autoFocus;
 	this.outlineVisible = false;
@@ -1745,7 +1768,10 @@ OO.ui.BookletLayout = function OoUiBookletLayout( config ) {
 		this.editable = !!config.editable;
 		this.outlineControlsWidget = null;
 		this.outlineSelectWidget = new OO.ui.OutlineSelectWidget();
-		this.outlinePanel = new OO.ui.PanelLayout( { scrollable: true } );
+		this.outlinePanel = new OO.ui.PanelLayout( {
+			expanded: this.expanded,
+			scrollable: true
+		} );
 		this.$menu.append( this.outlinePanel.$element );
 		this.outlineVisible = true;
 		if ( this.editable ) {
@@ -1856,12 +1882,21 @@ OO.ui.BookletLayout.prototype.onStackLayoutVisibleItemChange = function ( page )
  * @param {OO.ui.PanelLayout|null} page The page panel that is now the current panel
  */
 OO.ui.BookletLayout.prototype.onStackLayoutSet = function ( page ) {
-	var layout = this;
-	if ( !this.scrolling && page ) {
-		page.scrollElementIntoView().done( function () {
-			if ( layout.autoFocus && !OO.ui.isMobile() ) {
-				layout.focus();
-			}
+	var promise, layout = this;
+	// If everything is unselected, do nothing
+	if ( !page ) {
+		return;
+	}
+	// For continuous BookletLayouts, scroll the selected page into view first
+	if ( this.stackLayout.continuous && !this.scrolling ) {
+		promise = page.scrollElementIntoView();
+	} else {
+		promise = $.Deferred().resolve();
+	}
+	// Focus the first element on the newly selected panel
+	if ( this.autoFocus && !OO.ui.isMobile() ) {
+		promise.done( function () {
+			layout.focus();
 		} );
 	}
 };
@@ -1951,22 +1986,31 @@ OO.ui.BookletLayout.prototype.isOutlineVisible = function () {
  * @chainable
  */
 OO.ui.BookletLayout.prototype.toggleOutline = function ( show ) {
+	var booklet = this;
+
 	if ( this.outlined ) {
 		show = show === undefined ? !this.outlineVisible : !!show;
 		this.outlineVisible = show;
 		this.toggleMenu( show );
+		if ( show && this.editable ) {
+			// HACK: Kill dumb scrollbars when the sidebar stops animating, see T161798. Only necessary when
+			// outline controls are present, delay matches transition on `.oo-ui-menuLayout-menu`.
+			setTimeout( function () {
+				OO.ui.Element.static.reconsiderScrollbars( booklet.outlinePanel.$element[ 0 ] );
+			}, 200 );
+		}
 	}
 
 	return this;
 };
 
 /**
- * Get the page closest to the specified page.
+ * Find the page closest to the specified page.
  *
  * @param {OO.ui.PageLayout} page Page to use as a reference point
  * @return {OO.ui.PageLayout|null} Page closest to the specified page
  */
-OO.ui.BookletLayout.prototype.getClosestPage = function ( page ) {
+OO.ui.BookletLayout.prototype.findClosestPage = function ( page ) {
 	var next, prev, level,
 		pages = this.stackLayout.getItems(),
 		index = pages.indexOf( page );
@@ -1976,16 +2020,16 @@ OO.ui.BookletLayout.prototype.getClosestPage = function ( page ) {
 		prev = pages[ index - 1 ];
 		// Prefer adjacent pages at the same level
 		if ( this.outlined ) {
-			level = this.outlineSelectWidget.getItemFromData( page.getName() ).getLevel();
+			level = this.outlineSelectWidget.findItemFromData( page.getName() ).getLevel();
 			if (
 				prev &&
-				level === this.outlineSelectWidget.getItemFromData( prev.getName() ).getLevel()
+				level === this.outlineSelectWidget.findItemFromData( prev.getName() ).getLevel()
 			) {
 				return prev;
 			}
 			if (
 				next &&
-				level === this.outlineSelectWidget.getItemFromData( next.getName() ).getLevel()
+				level === this.outlineSelectWidget.findItemFromData( next.getName() ).getLevel()
 			) {
 				return next;
 			}
@@ -2120,7 +2164,7 @@ OO.ui.BookletLayout.prototype.removePages = function ( pages ) {
 		name = page.getName();
 		delete this.pages[ name ];
 		if ( this.outlined ) {
-			items.push( this.outlineSelectWidget.getItemFromData( name ) );
+			items.push( this.outlineSelectWidget.findItemFromData( name ) );
 			page.setOutlineItem( null );
 		}
 	}
@@ -2175,7 +2219,7 @@ OO.ui.BookletLayout.prototype.setPage = function ( name ) {
 
 	if ( name !== this.currentPageName ) {
 		if ( this.outlined ) {
-			selectedItem = this.outlineSelectWidget.getSelectedItem();
+			selectedItem = this.outlineSelectWidget.findSelectedItem();
 			if ( selectedItem && selectedItem.getData() !== name ) {
 				this.outlineSelectWidget.selectItemByData( name );
 			}
@@ -2221,42 +2265,42 @@ OO.ui.BookletLayout.prototype.setPage = function ( name ) {
  * @chainable
  */
 OO.ui.BookletLayout.prototype.selectFirstSelectablePage = function () {
-	if ( !this.outlineSelectWidget.getSelectedItem() ) {
-		this.outlineSelectWidget.selectItem( this.outlineSelectWidget.getFirstSelectableItem() );
+	if ( !this.outlineSelectWidget.findSelectedItem() ) {
+		this.outlineSelectWidget.selectItem( this.outlineSelectWidget.findFirstSelectableItem() );
 	}
 
 	return this;
 };
 
 /**
- * IndexLayouts contain {@link OO.ui.CardLayout card layouts} as well as
- * {@link OO.ui.TabSelectWidget tabs} that allow users to easily navigate through the cards and
- * select which one to display. By default, only one card is displayed at a time. When a user
- * navigates to a new card, the index layout automatically focuses on the first focusable element,
+ * IndexLayouts contain {@link OO.ui.TabPanelLayout tab panel layouts} as well as
+ * {@link OO.ui.TabSelectWidget tabs} that allow users to easily navigate through the tab panels and
+ * select which one to display. By default, only one tab panel is displayed at a time. When a user
+ * navigates to a new tab panel, the index layout automatically focuses on the first focusable element,
  * unless the default setting is changed.
  *
  * TODO: This class is similar to BookletLayout, we may want to refactor to reduce duplication
  *
  *     @example
- *     // Example of a IndexLayout that contains two CardLayouts.
+ *     // Example of a IndexLayout that contains two TabPanelLayouts.
  *
- *     function CardOneLayout( name, config ) {
- *         CardOneLayout.parent.call( this, name, config );
- *         this.$element.append( '<p>First card</p>' );
+ *     function TabPanelOneLayout( name, config ) {
+ *         TabPanelOneLayout.parent.call( this, name, config );
+ *         this.$element.append( '<p>First tab panel</p>' );
  *     }
- *     OO.inheritClass( CardOneLayout, OO.ui.CardLayout );
- *     CardOneLayout.prototype.setupTabItem = function () {
- *         this.tabItem.setLabel( 'Card one' );
+ *     OO.inheritClass( TabPanelOneLayout, OO.ui.TabPanelLayout );
+ *     TabPanelOneLayout.prototype.setupTabItem = function () {
+ *         this.tabItem.setLabel( 'Tab panel one' );
  *     };
  *
- *     var card1 = new CardOneLayout( 'one' ),
- *         card2 = new OO.ui.CardLayout( 'two', { label: 'Card two' } );
+ *     var tabPanel1 = new TabPanelOneLayout( 'one' ),
+ *         tabPanel2 = new OO.ui.TabPanelLayout( 'two', { label: 'Tab panel two' } );
  *
- *     card2.$element.append( '<p>Second card</p>' );
+ *     tabPanel2.$element.append( '<p>Second tab panel</p>' );
  *
  *     var index = new OO.ui.IndexLayout();
  *
- *     index.addCards ( [ card1, card2 ] );
+ *     index.addTabPanels ( [ tabPanel1, tabPanel2 ] );
  *     $( 'body' ).append( index.$element );
  *
  * @class
@@ -2264,9 +2308,8 @@ OO.ui.BookletLayout.prototype.selectFirstSelectablePage = function () {
  *
  * @constructor
  * @param {Object} [config] Configuration options
- * @cfg {boolean} [continuous=false] Show all cards, one after another
- * @cfg {boolean} [expanded=true] Expand the content panel to fill the entire parent element.
- * @cfg {boolean} [autoFocus=true] Focus on the first focusable element when a new card is displayed. Disabled on mobile.
+ * @cfg {boolean} [continuous=false] Show all tab panels, one after another
+ * @cfg {boolean} [autoFocus=true] Focus on the first focusable element when a new tab panel is displayed. Disabled on mobile.
  */
 OO.ui.IndexLayout = function OoUiIndexLayout( config ) {
 	// Configuration initialization
@@ -2276,18 +2319,21 @@ OO.ui.IndexLayout = function OoUiIndexLayout( config ) {
 	OO.ui.IndexLayout.parent.call( this, config );
 
 	// Properties
-	this.currentCardName = null;
-	this.cards = {};
+	this.currentTabPanelName = null;
+	this.tabPanels = {};
+
 	this.ignoreFocus = false;
 	this.stackLayout = new OO.ui.StackLayout( {
 		continuous: !!config.continuous,
-		expanded: config.expanded
+		expanded: this.expanded
 	} );
 	this.$content.append( this.stackLayout.$element );
 	this.autoFocus = config.autoFocus === undefined || !!config.autoFocus;
 
 	this.tabSelectWidget = new OO.ui.TabSelectWidget();
-	this.tabPanel = new OO.ui.PanelLayout();
+	this.tabPanel = new OO.ui.PanelLayout( {
+		expanded: this.expanded
+	} );
 	this.$menu.append( this.tabPanel.$element );
 
 	this.toggleMenu( true );
@@ -2315,25 +2361,25 @@ OO.inheritClass( OO.ui.IndexLayout, OO.ui.MenuLayout );
 /* Events */
 
 /**
- * A 'set' event is emitted when a card is {@link #setCard set} to be displayed by the index layout.
+ * A 'set' event is emitted when a tab panel is {@link #setTabPanel set} to be displayed by the index layout.
  * @event set
- * @param {OO.ui.CardLayout} card Current card
+ * @param {OO.ui.TabPanelLayout} tabPanel Current tab panel
  */
 
 /**
- * An 'add' event is emitted when cards are {@link #addCards added} to the index layout.
+ * An 'add' event is emitted when tab panels are {@link #addTabPanels added} to the index layout.
  *
  * @event add
- * @param {OO.ui.CardLayout[]} card Added cards
- * @param {number} index Index cards were added at
+ * @param {OO.ui.TabPanelLayout[]} tabPanel Added tab panels
+ * @param {number} index Index tab panels were added at
  */
 
 /**
- * A 'remove' event is emitted when cards are {@link #clearCards cleared} or
- * {@link #removeCards removed} from the index.
+ * A 'remove' event is emitted when tab panels are {@link #clearTabPanels cleared} or
+ * {@link #removeTabPanels removed} from the index.
  *
  * @event remove
- * @param {OO.ui.CardLayout[]} cards Removed cards
+ * @param {OO.ui.TabPanelLayout[]} tabPanel Removed tab panels
  */
 
 /* Methods */
@@ -2342,17 +2388,17 @@ OO.inheritClass( OO.ui.IndexLayout, OO.ui.MenuLayout );
  * Handle stack layout focus.
  *
  * @private
- * @param {jQuery.Event} e Focusin event
+ * @param {jQuery.Event} e Focusing event
  */
 OO.ui.IndexLayout.prototype.onStackLayoutFocus = function ( e ) {
 	var name, $target;
 
-	// Find the card that an element was focused within
-	$target = $( e.target ).closest( '.oo-ui-cardLayout' );
-	for ( name in this.cards ) {
-		// Check for card match, exclude current card to find only card changes
-		if ( this.cards[ name ].$element[ 0 ] === $target[ 0 ] && name !== this.currentCardName ) {
-			this.setCard( name );
+	// Find the tab panel that an element was focused within
+	$target = $( e.target ).closest( '.oo-ui-tabPanelLayout' );
+	for ( name in this.tabPanels ) {
+		// Check for tab panel match, exclude current tab panel to find only tab panel changes
+		if ( this.tabPanels[ name ].$element[ 0 ] === $target[ 0 ] && name !== this.currentTabPanelName ) {
+			this.setTabPanel( name );
 			break;
 		}
 	}
@@ -2362,47 +2408,47 @@ OO.ui.IndexLayout.prototype.onStackLayoutFocus = function ( e ) {
  * Handle stack layout set events.
  *
  * @private
- * @param {OO.ui.PanelLayout|null} card The card panel that is now the current panel
+ * @param {OO.ui.PanelLayout|null} tabPanel The tab panel that is now the current panel
  */
-OO.ui.IndexLayout.prototype.onStackLayoutSet = function ( card ) {
-	var layout = this;
-	if ( card ) {
-		card.scrollElementIntoView().done( function () {
-			if ( layout.autoFocus && !OO.ui.isMobile() ) {
-				layout.focus();
-			}
-		} );
+OO.ui.IndexLayout.prototype.onStackLayoutSet = function ( tabPanel ) {
+	// If everything is unselected, do nothing
+	if ( !tabPanel ) {
+		return;
+	}
+	// Focus the first element on the newly selected panel
+	if ( this.autoFocus && !OO.ui.isMobile() ) {
+		this.focus();
 	}
 };
 
 /**
- * Focus the first input in the current card.
+ * Focus the first input in the current tab panel.
  *
- * If no card is selected, the first selectable card will be selected.
- * If the focus is already in an element on the current card, nothing will happen.
+ * If no tab panel is selected, the first selectable tab panel will be selected.
+ * If the focus is already in an element on the current tab panel, nothing will happen.
  *
  * @param {number} [itemIndex] A specific item to focus on
  */
 OO.ui.IndexLayout.prototype.focus = function ( itemIndex ) {
-	var card,
+	var tabPanel,
 		items = this.stackLayout.getItems();
 
 	if ( itemIndex !== undefined && items[ itemIndex ] ) {
-		card = items[ itemIndex ];
+		tabPanel = items[ itemIndex ];
 	} else {
-		card = this.stackLayout.getCurrentItem();
+		tabPanel = this.stackLayout.getCurrentItem();
 	}
 
-	if ( !card ) {
-		this.selectFirstSelectableCard();
-		card = this.stackLayout.getCurrentItem();
+	if ( !tabPanel ) {
+		this.selectFirstSelectableTabPanel();
+		tabPanel = this.stackLayout.getCurrentItem();
 	}
-	if ( !card ) {
+	if ( !tabPanel ) {
 		return;
 	}
 	// Only change the focus if is not already in the current page
-	if ( !OO.ui.contains( card.$element[ 0 ], this.getElementDocument().activeElement, true ) ) {
-		card.focus();
+	if ( !OO.ui.contains( tabPanel.$element[ 0 ], this.getElementDocument().activeElement, true ) ) {
+		tabPanel.focus();
 	}
 };
 
@@ -2422,35 +2468,35 @@ OO.ui.IndexLayout.prototype.focusFirstFocusable = function () {
  */
 OO.ui.IndexLayout.prototype.onTabSelectWidgetSelect = function ( item ) {
 	if ( item ) {
-		this.setCard( item.getData() );
+		this.setTabPanel( item.getData() );
 	}
 };
 
 /**
- * Get the card closest to the specified card.
+ * Get the tab panel closest to the specified tab panel.
  *
- * @param {OO.ui.CardLayout} card Card to use as a reference point
- * @return {OO.ui.CardLayout|null} Card closest to the specified card
+ * @param {OO.ui.TabPanelLayout} tabPanel Tab panel to use as a reference point
+ * @return {OO.ui.TabPanelLayout|null} Tab panel closest to the specified
  */
-OO.ui.IndexLayout.prototype.getClosestCard = function ( card ) {
+OO.ui.IndexLayout.prototype.getClosestTabPanel = function ( tabPanel ) {
 	var next, prev, level,
-		cards = this.stackLayout.getItems(),
-		index = cards.indexOf( card );
+		tabPanels = this.stackLayout.getItems(),
+		index = tabPanels.indexOf( tabPanel );
 
 	if ( index !== -1 ) {
-		next = cards[ index + 1 ];
-		prev = cards[ index - 1 ];
-		// Prefer adjacent cards at the same level
-		level = this.tabSelectWidget.getItemFromData( card.getName() ).getLevel();
+		next = tabPanels[ index + 1 ];
+		prev = tabPanels[ index - 1 ];
+		// Prefer adjacent tab panels at the same level
+		level = this.tabSelectWidget.findItemFromData( tabPanel.getName() ).getLevel();
 		if (
 			prev &&
-			level === this.tabSelectWidget.getItemFromData( prev.getName() ).getLevel()
+			level === this.tabSelectWidget.findItemFromData( prev.getName() ).getLevel()
 		) {
 			return prev;
 		}
 		if (
 			next &&
-			level === this.tabSelectWidget.getItemFromData( next.getName() ).getLevel()
+			level === this.tabSelectWidget.findItemFromData( next.getName() ).getLevel()
 		) {
 			return next;
 		}
@@ -2468,204 +2514,204 @@ OO.ui.IndexLayout.prototype.getTabs = function () {
 };
 
 /**
- * Get a card by its symbolic name.
+ * Get a tab panel by its symbolic name.
  *
- * @param {string} name Symbolic name of card
- * @return {OO.ui.CardLayout|undefined} Card, if found
+ * @param {string} name Symbolic name of tab panel
+ * @return {OO.ui.TabPanelLayout|undefined} Tab panel, if found
  */
-OO.ui.IndexLayout.prototype.getCard = function ( name ) {
-	return this.cards[ name ];
+OO.ui.IndexLayout.prototype.getTabPanel = function ( name ) {
+	return this.tabPanels[ name ];
 };
 
 /**
- * Get the current card.
+ * Get the current tab panel.
  *
- * @return {OO.ui.CardLayout|undefined} Current card, if found
+ * @return {OO.ui.TabPanelLayout|undefined} Current tab panel, if found
  */
-OO.ui.IndexLayout.prototype.getCurrentCard = function () {
-	var name = this.getCurrentCardName();
-	return name ? this.getCard( name ) : undefined;
+OO.ui.IndexLayout.prototype.getCurrentTabPanel = function () {
+	var name = this.getCurrentTabPanelName();
+	return name ? this.getTabPanel( name ) : undefined;
 };
 
 /**
- * Get the symbolic name of the current card.
+ * Get the symbolic name of the current tab panel.
  *
- * @return {string|null} Symbolic name of the current card
+ * @return {string|null} Symbolic name of the current tab panel
  */
-OO.ui.IndexLayout.prototype.getCurrentCardName = function () {
-	return this.currentCardName;
+OO.ui.IndexLayout.prototype.getCurrentTabPanelName = function () {
+	return this.currentTabPanelName;
 };
 
 /**
- * Add cards to the index layout
+ * Add tab panels to the index layout
  *
- * When cards are added with the same names as existing cards, the existing cards will be
- * automatically removed before the new cards are added.
+ * When tab panels are added with the same names as existing tab panels, the existing tab panels
+ * will be automatically removed before the new tab panels are added.
  *
- * @param {OO.ui.CardLayout[]} cards Cards to add
+ * @param {OO.ui.TabPanelLayout[]} tabPanels Tab panels to add
  * @param {number} index Index of the insertion point
  * @fires add
  * @chainable
  */
-OO.ui.IndexLayout.prototype.addCards = function ( cards, index ) {
-	var i, len, name, card, item, currentIndex,
-		stackLayoutCards = this.stackLayout.getItems(),
+OO.ui.IndexLayout.prototype.addTabPanels = function ( tabPanels, index ) {
+	var i, len, name, tabPanel, item, currentIndex,
+		stackLayoutTabPanels = this.stackLayout.getItems(),
 		remove = [],
 		items = [];
 
-	// Remove cards with same names
-	for ( i = 0, len = cards.length; i < len; i++ ) {
-		card = cards[ i ];
-		name = card.getName();
+	// Remove tab panels with same names
+	for ( i = 0, len = tabPanels.length; i < len; i++ ) {
+		tabPanel = tabPanels[ i ];
+		name = tabPanel.getName();
 
-		if ( Object.prototype.hasOwnProperty.call( this.cards, name ) ) {
+		if ( Object.prototype.hasOwnProperty.call( this.tabPanels, name ) ) {
 			// Correct the insertion index
-			currentIndex = stackLayoutCards.indexOf( this.cards[ name ] );
+			currentIndex = stackLayoutTabPanels.indexOf( this.tabPanels[ name ] );
 			if ( currentIndex !== -1 && currentIndex + 1 < index ) {
 				index--;
 			}
-			remove.push( this.cards[ name ] );
+			remove.push( this.tabPanels[ name ] );
 		}
 	}
 	if ( remove.length ) {
-		this.removeCards( remove );
+		this.removeTabPanels( remove );
 	}
 
-	// Add new cards
-	for ( i = 0, len = cards.length; i < len; i++ ) {
-		card = cards[ i ];
-		name = card.getName();
-		this.cards[ card.getName() ] = card;
+	// Add new tab panels
+	for ( i = 0, len = tabPanels.length; i < len; i++ ) {
+		tabPanel = tabPanels[ i ];
+		name = tabPanel.getName();
+		this.tabPanels[ tabPanel.getName() ] = tabPanel;
 		item = new OO.ui.TabOptionWidget( { data: name } );
-		card.setTabItem( item );
+		tabPanel.setTabItem( item );
 		items.push( item );
 	}
 
 	if ( items.length ) {
 		this.tabSelectWidget.addItems( items, index );
-		this.selectFirstSelectableCard();
+		this.selectFirstSelectableTabPanel();
 	}
-	this.stackLayout.addItems( cards, index );
-	this.emit( 'add', cards, index );
+	this.stackLayout.addItems( tabPanels, index );
+	this.emit( 'add', tabPanels, index );
 
 	return this;
 };
 
 /**
- * Remove the specified cards from the index layout.
+ * Remove the specified tab panels from the index layout.
  *
- * To remove all cards from the index, you may wish to use the #clearCards method instead.
+ * To remove all tab panels from the index, you may wish to use the #clearTabPanels method instead.
  *
- * @param {OO.ui.CardLayout[]} cards An array of cards to remove
+ * @param {OO.ui.TabPanelLayout[]} tabPanels An array of tab panels to remove
  * @fires remove
  * @chainable
  */
-OO.ui.IndexLayout.prototype.removeCards = function ( cards ) {
-	var i, len, name, card,
+OO.ui.IndexLayout.prototype.removeTabPanels = function ( tabPanels ) {
+	var i, len, name, tabPanel,
 		items = [];
 
-	for ( i = 0, len = cards.length; i < len; i++ ) {
-		card = cards[ i ];
-		name = card.getName();
-		delete this.cards[ name ];
-		items.push( this.tabSelectWidget.getItemFromData( name ) );
-		card.setTabItem( null );
+	for ( i = 0, len = tabPanels.length; i < len; i++ ) {
+		tabPanel = tabPanels[ i ];
+		name = tabPanel.getName();
+		delete this.tabPanels[ name ];
+		items.push( this.tabSelectWidget.findItemFromData( name ) );
+		tabPanel.setTabItem( null );
 	}
 	if ( items.length ) {
 		this.tabSelectWidget.removeItems( items );
-		this.selectFirstSelectableCard();
+		this.selectFirstSelectableTabPanel();
 	}
-	this.stackLayout.removeItems( cards );
-	this.emit( 'remove', cards );
+	this.stackLayout.removeItems( tabPanels );
+	this.emit( 'remove', tabPanels );
 
 	return this;
 };
 
 /**
- * Clear all cards from the index layout.
+ * Clear all tab panels from the index layout.
  *
- * To remove only a subset of cards from the index, use the #removeCards method.
+ * To remove only a subset of tab panels from the index, use the #removeTabPanels method.
  *
  * @fires remove
  * @chainable
  */
-OO.ui.IndexLayout.prototype.clearCards = function () {
+OO.ui.IndexLayout.prototype.clearTabPanels = function () {
 	var i, len,
-		cards = this.stackLayout.getItems();
+		tabPanels = this.stackLayout.getItems();
 
-	this.cards = {};
-	this.currentCardName = null;
+	this.tabPanels = {};
+	this.currentTabPanelName = null;
 	this.tabSelectWidget.clearItems();
-	for ( i = 0, len = cards.length; i < len; i++ ) {
-		cards[ i ].setTabItem( null );
+	for ( i = 0, len = tabPanels.length; i < len; i++ ) {
+		tabPanels[ i ].setTabItem( null );
 	}
 	this.stackLayout.clearItems();
 
-	this.emit( 'remove', cards );
+	this.emit( 'remove', tabPanels );
 
 	return this;
 };
 
 /**
- * Set the current card by symbolic name.
+ * Set the current tab panel by symbolic name.
  *
  * @fires set
- * @param {string} name Symbolic name of card
+ * @param {string} name Symbolic name of tab panel
  */
-OO.ui.IndexLayout.prototype.setCard = function ( name ) {
+OO.ui.IndexLayout.prototype.setTabPanel = function ( name ) {
 	var selectedItem,
 		$focused,
-		card = this.cards[ name ],
-		previousCard = this.currentCardName && this.cards[ this.currentCardName ];
+		tabPanel = this.tabPanels[ name ],
+		previousTabPanel = this.currentTabPanelName && this.tabPanels[ this.currentTabPanelName ];
 
-	if ( name !== this.currentCardName ) {
-		selectedItem = this.tabSelectWidget.getSelectedItem();
+	if ( name !== this.currentTabPanelName ) {
+		selectedItem = this.tabSelectWidget.findSelectedItem();
 		if ( selectedItem && selectedItem.getData() !== name ) {
 			this.tabSelectWidget.selectItemByData( name );
 		}
-		if ( card ) {
-			if ( previousCard ) {
-				previousCard.setActive( false );
-				// Blur anything focused if the next card doesn't have anything focusable.
-				// This is not needed if the next card has something focusable (because once it is focused
+		if ( tabPanel ) {
+			if ( previousTabPanel ) {
+				previousTabPanel.setActive( false );
+				// Blur anything focused if the next tab panel doesn't have anything focusable.
+				// This is not needed if the next tab panel has something focusable (because once it is focused
 				// this blur happens automatically). If the layout is non-continuous, this check is
-				// meaningless because the next card is not visible yet and thus can't hold focus.
+				// meaningless because the next tab panel is not visible yet and thus can't hold focus.
 				if (
 					this.autoFocus &&
 					!OO.ui.isMobile() &&
 					this.stackLayout.continuous &&
-					OO.ui.findFocusable( card.$element ).length !== 0
+					OO.ui.findFocusable( tabPanel.$element ).length !== 0
 				) {
-					$focused = previousCard.$element.find( ':focus' );
+					$focused = previousTabPanel.$element.find( ':focus' );
 					if ( $focused.length ) {
 						$focused[ 0 ].blur();
 					}
 				}
 			}
-			this.currentCardName = name;
-			card.setActive( true );
-			this.stackLayout.setItem( card );
-			if ( !this.stackLayout.continuous && previousCard ) {
-				// This should not be necessary, since any inputs on the previous card should have been
+			this.currentTabPanelName = name;
+			tabPanel.setActive( true );
+			this.stackLayout.setItem( tabPanel );
+			if ( !this.stackLayout.continuous && previousTabPanel ) {
+				// This should not be necessary, since any inputs on the previous tab panel should have been
 				// blurred when it was hidden, but browsers are not very consistent about this.
-				$focused = previousCard.$element.find( ':focus' );
+				$focused = previousTabPanel.$element.find( ':focus' );
 				if ( $focused.length ) {
 					$focused[ 0 ].blur();
 				}
 			}
-			this.emit( 'set', card );
+			this.emit( 'set', tabPanel );
 		}
 	}
 };
 
 /**
- * Select the first selectable card.
+ * Select the first selectable tab panel.
  *
  * @chainable
  */
-OO.ui.IndexLayout.prototype.selectFirstSelectableCard = function () {
-	if ( !this.tabSelectWidget.getSelectedItem() ) {
-		this.tabSelectWidget.selectItem( this.tabSelectWidget.getFirstSelectableItem() );
+OO.ui.IndexLayout.prototype.selectFirstSelectableTabPanel = function () {
+	if ( !this.tabSelectWidget.findSelectedItem() ) {
+		this.tabSelectWidget.selectItem( this.tabSelectWidget.findFirstSelectableItem() );
 	}
 
 	return this;
@@ -2725,7 +2771,7 @@ OO.ui.ToggleWidget.prototype.getValue = function () {
 };
 
 /**
- * Set the state of the toggle: `true` for 'on', `false' for 'off'.
+ * Set the state of the toggle: `true` for 'on', `false` for 'off'.
  *
  * @param {boolean} value The state of the toggle
  * @fires change
@@ -2738,7 +2784,6 @@ OO.ui.ToggleWidget.prototype.setValue = function ( value ) {
 		this.emit( 'change', value );
 		this.$element.toggleClass( 'oo-ui-toggleWidget-on', value );
 		this.$element.toggleClass( 'oo-ui-toggleWidget-off', !value );
-		this.$element.attr( 'aria-checked', value.toString() );
 	}
 	return this;
 };
@@ -2749,7 +2794,7 @@ OO.ui.ToggleWidget.prototype.setValue = function ( value ) {
  * configured with {@link OO.ui.mixin.IconElement icons}, {@link OO.ui.mixin.IndicatorElement indicators},
  * {@link OO.ui.mixin.TitledElement titles}, {@link OO.ui.mixin.FlaggedElement styling flags},
  * and {@link OO.ui.mixin.LabelElement labels}. Please see
- * the [OOjs UI documentation][1] on MediaWiki for more information.
+ * the [OOUI documentation][1] on MediaWiki for more information.
  *
  *     @example
  *     // Toggle buttons in the 'off' and 'on' state.
@@ -2763,7 +2808,7 @@ OO.ui.ToggleWidget.prototype.setValue = function ( value ) {
  *     // Append the buttons to the DOM.
  *     $( 'body' ).append( toggleButton1.$element, toggleButton2.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Buttons_and_Switches#Toggle_buttons
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Widgets/Buttons_and_Switches#Toggle_buttons
  *
  * @class
  * @extends OO.ui.ToggleWidget
@@ -2960,6 +3005,25 @@ OO.ui.ToggleSwitchWidget.prototype.onKeyPress = function ( e ) {
 };
 
 /**
+ * @inheritdoc
+ */
+OO.ui.ToggleSwitchWidget.prototype.setValue = function ( value ) {
+	OO.ui.ToggleSwitchWidget.parent.prototype.setValue.call( this, value );
+	this.$element.attr( 'aria-checked', this.value.toString() );
+	return this;
+};
+
+/**
+ * @inheritdoc
+ */
+OO.ui.ToggleSwitchWidget.prototype.simulateLabelClick = function () {
+	if ( !this.isDisabled() ) {
+		this.setValue( !this.value );
+	}
+	this.focus();
+};
+
+/**
  * OutlineControlsWidget is a set of controls for an {@link OO.ui.OutlineSelectWidget outline select widget}.
  * Controls include moving items up and down, removing items, and adding different kinds of items.
  *
@@ -3009,7 +3073,7 @@ OO.ui.OutlineControlsWidget = function OoUiOutlineControlsWidget( outline, confi
 	} );
 	this.removeButton = new OO.ui.ButtonWidget( {
 		framed: false,
-		icon: 'remove',
+		icon: 'trash',
 		title: OO.ui.msg( 'ooui-outline-control-remove' )
 	} );
 	this.abilities = { move: true, remove: true };
@@ -3080,7 +3144,7 @@ OO.ui.OutlineControlsWidget.prototype.setAbilities = function ( abilities ) {
 OO.ui.OutlineControlsWidget.prototype.onOutlineChange = function () {
 	var i, len, firstMovable, lastMovable,
 		items = this.outline.getItems(),
-		selectedItem = this.outline.getSelectedItem(),
+		selectedItem = this.outline.findSelectedItem(),
 		movable = this.abilities.move && selectedItem && selectedItem.isMovable(),
 		removable = this.abilities.remove && selectedItem && selectedItem.isRemovable();
 
@@ -3208,11 +3272,6 @@ OO.ui.OutlineOptionWidget.prototype.getLevel = function () {
  */
 OO.ui.OutlineOptionWidget.prototype.setPressed = function ( state ) {
 	OO.ui.OutlineOptionWidget.parent.prototype.setPressed.call( this, state );
-	if ( this.pressed ) {
-		this.setFlags( { progressive: true } );
-	} else if ( !this.selected ) {
-		this.setFlags( { progressive: false } );
-	}
 	return this;
 };
 
@@ -3249,11 +3308,6 @@ OO.ui.OutlineOptionWidget.prototype.setRemovable = function ( removable ) {
  */
 OO.ui.OutlineOptionWidget.prototype.setSelected = function ( state ) {
 	OO.ui.OutlineOptionWidget.parent.prototype.setSelected.call( this, state );
-	if ( this.selected ) {
-		this.setFlags( { progressive: true } );
-	} else {
-		this.setFlags( { progressive: false } );
-	}
 	return this;
 };
 
@@ -3320,9 +3374,9 @@ OO.mixinClass( OO.ui.OutlineSelectWidget, OO.ui.mixin.TabIndexedElement );
  * ButtonOptionWidget is a special type of {@link OO.ui.mixin.ButtonElement button element} that
  * can be selected and configured with data. The class is
  * used with OO.ui.ButtonSelectWidget to create a selection of button options. Please see the
- * [OOjs UI documentation on MediaWiki] [1] for more information.
+ * [OOUI documentation on MediaWiki] [1] for more information.
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options#Button_selects_and_options
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Widgets/Selects_and_Options#Button_selects_and_options
  *
  * @class
  * @extends OO.ui.OptionWidget
@@ -3397,7 +3451,7 @@ OO.ui.ButtonOptionWidget.prototype.setSelected = function ( state ) {
  * button options and is used together with
  * OO.ui.ButtonOptionWidget. The ButtonSelectWidget provides an interface for
  * highlighting, choosing, and selecting mutually exclusive options. Please see
- * the [OOjs UI documentation on MediaWiki] [1] for more information.
+ * the [OOUI documentation on MediaWiki] [1] for more information.
  *
  *     @example
  *     // Example: A ButtonSelectWidget that contains three ButtonOptionWidgets
@@ -3424,7 +3478,7 @@ OO.ui.ButtonOptionWidget.prototype.setSelected = function ( state ) {
  *     } );
  *     $( 'body' ).append( buttonSelect.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Widgets/Selects_and_Options
  *
  * @class
  * @extends OO.ui.SelectWidget
@@ -3459,7 +3513,7 @@ OO.mixinClass( OO.ui.ButtonSelectWidget, OO.ui.mixin.TabIndexedElement );
  * TabOptionWidget is an item in a {@link OO.ui.TabSelectWidget TabSelectWidget}.
  *
  * Currently, this class is only used by {@link OO.ui.IndexLayout index layouts}, which contain
- * {@link OO.ui.CardLayout card layouts}. See {@link OO.ui.IndexLayout IndexLayout}
+ * {@link OO.ui.TabPanelLayout tab panel layouts}. See {@link OO.ui.IndexLayout IndexLayout}
  * for an example.
  *
  * @class
@@ -3555,8 +3609,9 @@ OO.ui.CapsuleItemWidget = function OoUiCapsuleItemWidget( config ) {
 	// Events
 	this.closeButton = new OO.ui.ButtonWidget( {
 		framed: false,
-		indicator: 'clear',
-		tabIndex: -1
+		icon: 'close',
+		tabIndex: -1,
+		title: OO.ui.msg( 'ooui-item-remove' )
 	} ).on( 'click', this.onCloseClick.bind( this ) );
 
 	this.on( 'disable', function ( disabled ) {
@@ -3629,17 +3684,10 @@ OO.ui.CapsuleItemWidget.prototype.onKeyDown = function ( e ) {
 };
 
 /**
- * Focuses the capsule
- */
-OO.ui.CapsuleItemWidget.prototype.focus = function () {
-	this.$element.focus();
-};
-
-/**
  * CapsuleMultiselectWidgets are something like a {@link OO.ui.ComboBoxInputWidget combo box widget}
  * that allows for selecting multiple values.
  *
- * For more information about menus and options, please see the [OOjs UI documentation on MediaWiki][1].
+ * For more information about menus and options, please see the [OOUI documentation on MediaWiki][1].
  *
  *     @example
  *     // Example: A CapsuleMultiselectWidget.
@@ -3673,7 +3721,7 @@ OO.ui.CapsuleItemWidget.prototype.focus = function () {
  *     } );
  *     $( 'body' ).append( capsule.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options#Menu_selects_and_options
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Widgets/Selects_and_Options#Menu_selects_and_options
  *
  * @class
  * @extends OO.ui.Widget
@@ -3683,7 +3731,7 @@ OO.ui.CapsuleItemWidget.prototype.focus = function () {
  * @mixins OO.ui.mixin.IndicatorElement
  * @mixins OO.ui.mixin.IconElement
  * @uses OO.ui.CapsuleItemWidget
- * @uses OO.ui.FloatingMenuSelectWidget
+ * @uses OO.ui.MenuSelectWidget
  *
  * @constructor
  * @param {Object} [config] Configuration options
@@ -3701,6 +3749,7 @@ OO.ui.CapsuleItemWidget.prototype.focus = function () {
  *  its containing `<div>`. The specified overlay layer is usually on top of
  *  the containing `<div>` and has a larger area. By default, the menu uses
  *  relative positioning.
+ *  See <https://www.mediawiki.org/wiki/OOUI/Concepts#Overlays>.
  */
 OO.ui.CapsuleMultiselectWidget = function OoUiCapsuleMultiselectWidget( config ) {
 	var $tabFocus;
@@ -3711,8 +3760,7 @@ OO.ui.CapsuleMultiselectWidget = function OoUiCapsuleMultiselectWidget( config )
 	// Configuration initialization
 	config = $.extend( {
 		allowArbitrary: false,
-		allowDuplicates: false,
-		$overlay: this.$element
+		allowDuplicates: false
 	}, config );
 
 	// Properties (must be set before mixin constructor calls)
@@ -3744,12 +3792,12 @@ OO.ui.CapsuleMultiselectWidget = function OoUiCapsuleMultiselectWidget( config )
 	this.$content = $( '<div>' );
 	this.allowArbitrary = config.allowArbitrary;
 	this.allowDuplicates = config.allowDuplicates;
-	this.$overlay = config.$overlay;
-	this.menu = new OO.ui.FloatingMenuSelectWidget( $.extend(
+	this.$overlay = ( config.$overlay === true ? OO.ui.getDefaultOverlay() : config.$overlay ) || this.$element;
+	this.menu = new OO.ui.MenuSelectWidget( $.extend(
 		{
 			widget: this,
 			$input: this.$input,
-			$container: this.$element,
+			$floatableContainer: this.$element,
 			filterFromInput: true,
 			disabled: this.isDisabled()
 		},
@@ -3795,6 +3843,7 @@ OO.ui.CapsuleMultiselectWidget = function OoUiCapsuleMultiselectWidget( config )
 		this.$input.prop( 'disabled', this.isDisabled() );
 		this.$input.attr( {
 			role: 'combobox',
+			'aria-owns': this.menu.getElementId(),
 			'aria-autocomplete': 'list'
 		} );
 	}
@@ -3839,10 +3888,6 @@ OO.mixinClass( OO.ui.CapsuleMultiselectWidget, OO.ui.mixin.TabIndexedElement );
 OO.mixinClass( OO.ui.CapsuleMultiselectWidget, OO.ui.mixin.IndicatorElement );
 OO.mixinClass( OO.ui.CapsuleMultiselectWidget, OO.ui.mixin.IconElement );
 
-/* Static Properties */
-
-OO.ui.CapsuleMultiselectWidget.static.supportsSimpleLabel = true;
-
 /* Events */
 
 /**
@@ -3879,23 +3924,13 @@ OO.ui.CapsuleMultiselectWidget.prototype.createItemWidget = function ( data, lab
 };
 
 /**
- * Get the widget's input's id, or generate one, if it has an input.
- *
- * @return {string}
+ * @inheritdoc
  */
 OO.ui.CapsuleMultiselectWidget.prototype.getInputId = function () {
-	var id;
 	if ( !this.$input ) {
-		return false;
+		return null;
 	}
-
-	id = this.$input.attr( 'id' );
-	if ( id === undefined ) {
-		id = OO.ui.generateElementId();
-		this.$input.attr( 'id', id );
-	}
-
-	return id;
+	return OO.ui.mixin.TabIndexedElement.prototype.getInputId.call( this );
 };
 
 /**
@@ -3923,7 +3958,7 @@ OO.ui.CapsuleMultiselectWidget.prototype.setItemsFromData = function ( datas ) {
 
 	$.each( datas, function ( i, data ) {
 		var j, label,
-			item = menu.getItemFromData( data );
+			item = menu.findItemFromData( data );
 
 		if ( item ) {
 			label = item.label;
@@ -3971,8 +4006,8 @@ OO.ui.CapsuleMultiselectWidget.prototype.addItemsFromData = function ( datas ) {
 	$.each( datas, function ( i, data ) {
 		var item;
 
-		if ( !widget.getItemFromData( data ) || widget.allowDuplicates ) {
-			item = menu.getItemFromData( data );
+		if ( !widget.findItemFromData( data ) || widget.allowDuplicates ) {
+			item = menu.findItemFromData( data );
 			if ( item ) {
 				item = widget.createItemWidget( data, item.label );
 			} else if ( widget.allowArbitrary ) {
@@ -4023,7 +4058,7 @@ OO.ui.CapsuleMultiselectWidget.prototype.removeItemsFromData = function ( datas 
 		items = [];
 
 	$.each( datas, function ( i, data ) {
-		var item = widget.getItemFromData( data );
+		var item = widget.findItemFromData( data );
 		if ( item ) {
 			items.push( item );
 		}
@@ -4180,6 +4215,7 @@ OO.ui.CapsuleMultiselectWidget.prototype.getMenu = function () {
  */
 OO.ui.CapsuleMultiselectWidget.prototype.onInputFocus = function () {
 	if ( !this.isDisabled() ) {
+		this.updateInputSize();
 		this.menu.toggle( true );
 	}
 };
@@ -4382,7 +4418,7 @@ OO.ui.CapsuleMultiselectWidget.prototype.onMenuChoose = function ( item ) {
  * Handle menu toggle events.
  *
  * @private
- * @param {boolean} isVisible Menu toggle event
+ * @param {boolean} isVisible Open state of the menu
  */
 OO.ui.CapsuleMultiselectWidget.prototype.onMenuToggle = function ( isVisible ) {
 	this.$element.toggleClass( 'oo-ui-capsuleMultiselectWidget-open', isVisible );
@@ -4448,7 +4484,6 @@ OO.ui.CapsuleMultiselectWidget.prototype.setDisabled = function ( disabled ) {
  * Focus the widget
  *
  * @chainable
- * @return {OO.ui.CapsuleMultiselectWidget}
  */
 OO.ui.CapsuleMultiselectWidget.prototype.focus = function () {
 	if ( !this.isDisabled() ) {
@@ -4457,9 +4492,7 @@ OO.ui.CapsuleMultiselectWidget.prototype.focus = function () {
 			this.popup.toggle( true );
 			OO.ui.findFocusable( this.popup.$element ).focus();
 		} else {
-			this.updateInputSize();
-			this.menu.toggle( true );
-			this.$input.focus();
+			OO.ui.mixin.TabIndexedElement.prototype.focus.call( this );
 		}
 	}
 	return this;
@@ -4498,8 +4531,9 @@ OO.ui.TagItemWidget = function OoUiTagItemWidget( config ) {
 
 	this.closeButton = new OO.ui.ButtonWidget( {
 		framed: false,
-		indicator: 'clear',
-		tabIndex: -1
+		icon: 'close',
+		tabIndex: -1,
+		title: OO.ui.msg( 'ooui-item-remove' )
 	} );
 	this.closeButton.setDisabled( this.isDisabled() );
 
@@ -4562,10 +4596,18 @@ OO.mixinClass( OO.ui.TagItemWidget, OO.ui.mixin.DraggableElement );
  * Item validity has changed
  */
 
+/**
+ * @event disabled
+ * @param {boolean} isDisabled Item is disabled
+ *
+ * Item disabled state has changed
+ */
+
 /* Methods */
 
 /**
  * @inheritdoc
+ * @fires disabled
  */
 OO.ui.TagItemWidget.prototype.setDisabled = function ( state ) {
 	// Parent method
@@ -4574,6 +4616,8 @@ OO.ui.TagItemWidget.prototype.setDisabled = function ( state ) {
 	if ( this.closeButton ) {
 		this.closeButton.setDisabled( state );
 	}
+
+	this.emit( 'disabled', this.isDisabled() );
 	return this;
 };
 
@@ -4598,12 +4642,13 @@ OO.ui.TagItemWidget.prototype.remove = function () {
  *
  * @fires navigate
  * @fires remove
+ * @param {jQuery.Event} e Key down event
  * @return {boolean|undefined} false to stop the operation
  */
 OO.ui.TagItemWidget.prototype.onKeyDown = function ( e ) {
 	var movement;
 
-	if ( e.keyCode === OO.ui.Keys.BACKSPACE || e.keyCode === OO.ui.Keys.DELETE ) {
+	if ( !this.isDisabled() && e.keyCode === OO.ui.Keys.BACKSPACE || e.keyCode === OO.ui.Keys.DELETE ) {
 		this.remove();
 		return false;
 	} else if ( e.keyCode === OO.ui.Keys.ENTER ) {
@@ -4630,15 +4675,7 @@ OO.ui.TagItemWidget.prototype.onKeyDown = function ( e ) {
 			e.keyCode === OO.ui.Keys.LEFT ?
 				movement.left : movement.right
 		);
-	}
-};
-
-/**
- * Focuses the capsule
- */
-OO.ui.TagItemWidget.prototype.focus = function () {
-	if ( !this.isDisabled() ) {
-		this.$element.focus();
+		return false;
 	}
 };
 
@@ -4684,8 +4721,6 @@ OO.ui.TagItemWidget.prototype.isValid = function () {
  * A basic tag multiselect widget, similar in concept to {@link OO.ui.ComboBoxInputWidget combo box widget}
  * that allows the user to add multiple values that are displayed in a tag area.
  *
- * For more information about menus and options, please see the [OOjs UI documentation on MediaWiki][1].
- *
  * This widget is a base widget; see {@link OO.ui.MenuTagMultiselectWidget MenuTagMultiselectWidget} and
  * {@link OO.ui.PopupTagMultiselectWidget PopupTagMultiselectWidget} for the implementations that use
  * a menu and a popup respectively.
@@ -4698,8 +4733,6 @@ OO.ui.TagItemWidget.prototype.isValid = function () {
  *         selected: [ 'Option 1' ]
  *     } );
  *     $( 'body' ).append( widget.$element );
- *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options#Menu_selects_and_options
  *
  * @class
  * @extends OO.ui.Widget
@@ -4761,7 +4794,8 @@ OO.ui.TagMultiselectWidget = function OoUiTagMultiselectWidget( config ) {
 			true : !!config.allowReordering
 	);
 
-	this.inputPosition = this.constructor.static.allowedInputPositions.indexOf( config.inputPosition ) > -1 ?
+	this.inputPosition =
+		this.constructor.static.allowedInputPositions.indexOf( config.inputPosition ) > -1 ?
 			config.inputPosition : 'inline';
 	this.allowEditTags = config.allowEditTags === undefined ? true : !!config.allowEditTags;
 	this.allowArbitrary = !!config.allowArbitrary;
@@ -4790,11 +4824,13 @@ OO.ui.TagMultiselectWidget = function OoUiTagMultiselectWidget( config ) {
 	this.aggregate( {
 		remove: 'itemRemove',
 		navigate: 'itemNavigate',
-		select: 'itemSelect'
+		select: 'itemSelect',
+		disabled: 'itemDisabled'
 	} );
 	this.connect( this, {
 		itemRemove: 'onTagRemove',
 		itemSelect: 'onTagSelect',
+		itemDisabled: 'onTagDisabled',
 		itemNavigate: 'onTagNavigate',
 		change: 'onChangeTags'
 	} );
@@ -4850,6 +4886,8 @@ OO.ui.TagMultiselectWidget = function OoUiTagMultiselectWidget( config ) {
 			// having only the $input attached to the DOM
 			this.$content.append( this.input.$input );
 		}
+	} else {
+		this.$content.append( $tabFocus );
 	}
 
 	this.setTabIndexedElement(
@@ -4903,7 +4941,11 @@ OO.ui.TagMultiselectWidget.static.allowedInputPositions = [ 'inline', 'outline',
  * @return {boolean} False to prevent defaults
  */
 OO.ui.TagMultiselectWidget.prototype.onMouseDown = function ( e ) {
-	if ( !this.isDisabled() && e.which === OO.ui.MouseButtons.LEFT ) {
+	if (
+		!this.isDisabled() &&
+		( !this.hasInput || e.target !== this.input.$input[ 0 ] ) &&
+		e.which === OO.ui.MouseButtons.LEFT
+	) {
 		this.focus();
 		return false;
 	}
@@ -4940,7 +4982,22 @@ OO.ui.TagMultiselectWidget.prototype.onInputKeyPress = function ( e ) {
  */
 OO.ui.TagMultiselectWidget.prototype.onInputKeyDown = function ( e ) {
 	var movement, direction,
-		withMetaKey = e.metaKey || e.ctrlKey;
+		widget = this,
+		withMetaKey = e.metaKey || e.ctrlKey,
+		isMovementInsideInput = function ( direction ) {
+			var inputRange = widget.input.getRange(),
+				inputValue = widget.hasInput && widget.input.getValue();
+
+			if ( direction === 'forwards' && inputRange.to > inputValue.length - 1 ) {
+				return false;
+			}
+
+			if ( direction === 'backwards' && inputRange.from <= 0 ) {
+				return false;
+			}
+
+			return true;
+		};
 
 	if ( !this.isDisabled() ) {
 		// 'keypress' event is not triggered for Backspace
@@ -4966,7 +5023,9 @@ OO.ui.TagMultiselectWidget.prototype.onInputKeyDown = function ( e ) {
 			direction = e.keyCode === OO.ui.Keys.LEFT ?
 				movement.left : movement.right;
 
-			return this.doInputArrow( e, direction, withMetaKey );
+			if ( !this.hasInput || !isMovementInsideInput( direction ) ) {
+				return this.doInputArrow( e, direction, withMetaKey );
+			}
 		}
 	}
 };
@@ -4974,12 +5033,16 @@ OO.ui.TagMultiselectWidget.prototype.onInputKeyDown = function ( e ) {
 /**
  * Respond to input focus event
  */
-OO.ui.TagMultiselectWidget.prototype.onInputFocus = function () {};
+OO.ui.TagMultiselectWidget.prototype.onInputFocus = function () {
+	this.$element.addClass( 'oo-ui-tagMultiselectWidget-focus' );
+};
 
 /**
  * Respond to input blur event
  */
-OO.ui.TagMultiselectWidget.prototype.onInputBlur = function () {};
+OO.ui.TagMultiselectWidget.prototype.onInputBlur = function () {
+	this.$element.removeClass( 'oo-ui-tagMultiselectWidget-focus' );
+};
 
 /**
  * Perform an action after the enter key on the input
@@ -5002,7 +5065,7 @@ OO.ui.TagMultiselectWidget.prototype.doInputEnter = function () {
  * a meta key like 'ctrl'
  * @return {boolean} Whether to prevent defaults
  */
-OO.ui.TagMultiselectWidget.prototype.doInputBackspace = function () {
+OO.ui.TagMultiselectWidget.prototype.doInputBackspace = function ( e, withMetaKey ) {
 	var items, item;
 
 	if (
@@ -5013,8 +5076,15 @@ OO.ui.TagMultiselectWidget.prototype.doInputBackspace = function () {
 		// Delete the last item
 		items = this.getItems();
 		item = items[ items.length - 1 ];
-		this.input.setValue( item.getData() );
-		this.removeItems( [ item ] );
+
+		if ( !item.isDisabled() ) {
+			this.removeItems( [ item ] );
+			// If Ctrl/Cmd was pressed, delete item entirely.
+			// Otherwise put it into the text field for editing.
+			if ( !withMetaKey ) {
+				this.input.setValue( item.getData() );
+			}
+		}
 
 		return false;
 	}
@@ -5024,7 +5094,6 @@ OO.ui.TagMultiselectWidget.prototype.doInputBackspace = function () {
  * Perform an action after the escape key on the input
  *
  * @param {jQuery.Event} e Event data
- * @return {boolean} Whether to prevent defaults
  */
 OO.ui.TagMultiselectWidget.prototype.doInputEscape = function () {
 	this.clearInput();
@@ -5032,32 +5101,29 @@ OO.ui.TagMultiselectWidget.prototype.doInputEscape = function () {
 
 /**
  * Perform an action after the arrow key on the input, select the previous
- * or next item from the input.
- * See #getPreviousItem and #getNextItem
+ * item from the input.
+ * See #getPreviousItem
  *
  * @param {jQuery.Event} e Event data
  * @param {string} direction Direction of the movement; forwards or backwards
  * @param {boolean} [withMetaKey] Whether this key was pressed with
  *  a meta key like 'ctrl'
- * @return {boolean} Whether to prevent defaults
  */
-OO.ui.TagMultiselectWidget.prototype.doInputArrow = function ( direction ) {
+OO.ui.TagMultiselectWidget.prototype.doInputArrow = function ( e, direction ) {
 	if (
 		this.inputPosition === 'inline' &&
-		!this.isEmpty()
+		!this.isEmpty() &&
+		direction === 'backwards'
 	) {
-		if ( direction === 'backwards' ) {
-			// Get previous item
-			this.getPreviousItem().focus();
-		} else {
-			// Get next item
-			this.getNextItem().focus();
-		}
+		// Get previous item
+		this.getPreviousItem().focus();
 	}
 };
 
 /**
  * Respond to item select event
+ *
+ * @param {OO.ui.TagItemWidget} item Selected item
  */
 OO.ui.TagMultiselectWidget.prototype.onTagSelect = function ( item ) {
 	if ( this.hasInput && this.allowEditTags ) {
@@ -5073,6 +5139,18 @@ OO.ui.TagMultiselectWidget.prototype.onTagSelect = function ( item ) {
 	}
 };
 
+/**
+ * Respond to item disabled state change
+ *
+ * @param {OO.ui.TagItemWidget} item Selected item
+ * @param {boolean} isDisabled Item is disabled
+ */
+OO.ui.TagMultiselectWidget.prototype.onTagDisabled = function ( item, isDisabled ) {
+	if ( isDisabled ) {
+	// Move item to start if it is disabled
+		this.addItems( item, 0 );
+	}
+};
 /**
  * Respond to change event, where items were added, removed, or cleared.
  */
@@ -5117,9 +5195,13 @@ OO.ui.TagMultiselectWidget.prototype.onTagRemove = function ( item ) {
  * @param {string} direction Direction of movement; 'forwards' or 'backwards'
  */
 OO.ui.TagMultiselectWidget.prototype.onTagNavigate = function ( item, direction ) {
+	var firstItem = this.getItems()[ 0 ];
+
 	if ( direction === 'forwards' ) {
 		this.getNextItem( item ).focus();
-	} else {
+	} else if ( !this.inputPosition === 'inline' || item !== firstItem ) {
+		// If the widget has an inline input, we want to stop at the starting edge
+		// of the tags
 		this.getPreviousItem( item ).focus();
 	}
 };
@@ -5157,7 +5239,7 @@ OO.ui.TagMultiselectWidget.prototype.clearInput = function () {
  * @return {boolean} Value is duplicate
  */
 OO.ui.TagMultiselectWidget.prototype.isDuplicateData = function ( data ) {
-	return !!this.getItemFromData( data );
+	return !!this.findItemFromData( data );
 };
 
 /**
@@ -5167,15 +5249,15 @@ OO.ui.TagMultiselectWidget.prototype.isDuplicateData = function ( data ) {
  * @return {boolean} Value is allowed
  */
 OO.ui.TagMultiselectWidget.prototype.isAllowedData = function ( data ) {
-	if ( this.allowArbitrary ) {
-		return true;
-	}
-
 	if (
 		!this.allowDuplicates &&
 		this.isDuplicateData( data )
 	) {
 		return false;
+	}
+
+	if ( this.allowArbitrary ) {
+		return true;
 	}
 
 	// Check with allowed values
@@ -5211,15 +5293,6 @@ OO.ui.TagMultiselectWidget.prototype.addAllowedValue = function ( value ) {
 };
 
 /**
- * Focus the widget
- */
-OO.ui.TagMultiselectWidget.prototype.focus = function () {
-	if ( this.hasInput ) {
-		this.input.focus();
-	}
-};
-
-/**
  * Get the datas of the currently selected items
  *
  * @return {string[]|Object[]} Datas of currently selected items
@@ -5237,7 +5310,7 @@ OO.ui.TagMultiselectWidget.prototype.getValue = function () {
 /**
  * Set the value of this widget by datas.
  *
- * @param {string|string[]|Object|Object[]} value An object representing the data
+ * @param {string|string[]|Object|Object[]} valueObject An object representing the data
  *  and label of the value. If the widget allows arbitrary values,
  *  the items will be added as-is. Otherwise, the data value will
  *  be checked against allowedValues.
@@ -5280,7 +5353,9 @@ OO.ui.TagMultiselectWidget.prototype.addTag = function ( data, label ) {
 		newItemWidget = this.createTagItemWidget( data, label );
 		newItemWidget.toggleValid( isValid );
 		this.addItems( [ newItemWidget ] );
+		return true;
 	}
+	return false;
 };
 
 /**
@@ -5289,7 +5364,7 @@ OO.ui.TagMultiselectWidget.prototype.addTag = function ( data, label ) {
  * @param {string|Object} data Tag data
  */
 OO.ui.TagMultiselectWidget.prototype.removeTagByData = function ( data ) {
-	var item = this.getItemFromData( data );
+	var item = this.findItemFromData( data );
 
 	this.removeItems( [ item ] );
 };
@@ -5375,6 +5450,12 @@ OO.ui.TagMultiselectWidget.prototype.getPreviousItem = function ( item ) {
 OO.ui.TagMultiselectWidget.prototype.updateInputSize = function () {
 	var $lastItem, direction, contentWidth, currentWidth, bestWidth;
 	if ( this.inputPosition === 'inline' && !this.isDisabled() ) {
+		if ( this.input.$input[ 0 ].scrollWidth === 0 ) {
+			// Input appears to be attached but not visible.
+			// Don't attempt to adjust its size, because our measurements
+			// are going to fail anyway.
+			return;
+		}
 		this.input.$input.css( 'width', '1em' );
 		$lastItem = this.$group.children().last();
 		direction = OO.ui.Element.static.getDir( this.$handle );
@@ -5488,8 +5569,6 @@ OO.ui.TagMultiselectWidget.prototype.isValid = function () {
  * PopupTagMultiselectWidget is a {@link OO.ui.TagMultiselectWidget OO.ui.TagMultiselectWidget} intended
  * to use a popup. The popup can be configured to have a default input to insert values into the widget.
  *
- * For more information about menus and options, please see the [OOjs UI documentation on MediaWiki][1].
- *
  *     @example
  *     // Example: A basic PopupTagMultiselectWidget.
  *     var widget = new OO.ui.PopupTagMultiselectWidget();
@@ -5505,14 +5584,13 @@ OO.ui.TagMultiselectWidget.prototype.isValid = function () {
  *         } );
  *     $( 'body' ).append( widget.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options#Menu_selects_and_options
- *
  * @class
  * @extends OO.ui.TagMultiselectWidget
  * @mixins OO.ui.mixin.PopupElement
  *
  * @param {Object} config Configuration object
- * @cfg {jQuery} [$overlay] An overlay for the popup
+ * @cfg {jQuery} [$overlay] An overlay for the popup.
+ *  See <https://www.mediawiki.org/wiki/OOUI/Concepts#Overlays>.
  * @cfg {Object} [popup] Configuration options for the popup
  * @cfg {OO.ui.InputWidget} [popupInput] An input widget inside the popup that will be
  *  focused when the popup is opened and will be used as replacement for the
@@ -5527,7 +5605,7 @@ OO.ui.PopupTagMultiselectWidget = function OoUiPopupTagMultiselectWidget( config
 	// Parent constructor
 	OO.ui.PopupTagMultiselectWidget.parent.call( this, $.extend( { inputPosition: 'none' }, config ) );
 
-	this.$overlay = config.$overlay || this.$element;
+	this.$overlay = ( config.$overlay === true ? OO.ui.getDefaultOverlay() : config.$overlay ) || this.$element;
 
 	if ( !config.popup ) {
 		// For the default base implementation, we give a popup
@@ -5538,6 +5616,7 @@ OO.ui.PopupTagMultiselectWidget = function OoUiPopupTagMultiselectWidget( config
 
 		defaultConfig.popupInput = defaultInput;
 		defaultConfig.popup.$content = defaultInput.$element;
+		defaultConfig.popup.padded = true;
 
 		this.$element.addClass( 'oo-ui-popupTagMultiselectWidget-defaultPopup' );
 	}
@@ -5566,9 +5645,10 @@ OO.ui.PopupTagMultiselectWidget = function OoUiPopupTagMultiselectWidget( config
 	}
 
 	// Events
+	this.on( 'resize', this.popup.updateDimensions.bind( this.popup ) );
 	this.popup.connect( this, { toggle: 'onPopupToggle' } );
 	this.$tabIndexed
-		.on( 'focus', this.focus.bind( this ) );
+		.on( 'focus', this.onFocus.bind( this ) );
 
 	// Initialize
 	this.$element
@@ -5584,17 +5664,11 @@ OO.mixinClass( OO.ui.PopupTagMultiselectWidget, OO.ui.mixin.PopupElement );
 /* Methods */
 
 /**
- * @inheritdoc
+ * Focus event handler.
+ *
+ * @private
  */
-OO.ui.PopupTagMultiselectWidget.prototype.focus = function () {
-	// Since the parent deals with input focus, only
-	// call the parent method if our input isn't in the
-	// popup
-	if ( !this.popupInput ) {
-		// Parent method
-		OO.ui.PopupTagMultiselectWidget.parent.prototype.focus.call( this );
-	}
-
+OO.ui.PopupTagMultiselectWidget.prototype.onFocus = function () {
 	this.popup.toggle( true );
 };
 
@@ -5652,8 +5726,6 @@ OO.ui.PopupTagMultiselectWidget.prototype.addTagByPopupValue = function ( data, 
  * MenuTagMultiselectWidget is a {@link OO.ui.TagMultiselectWidget OO.ui.TagMultiselectWidget} intended
  * to use a menu of selectable options.
  *
- * For more information about menus and options, please see the [OOjs UI documentation on MediaWiki][1].
- *
  *     @example
  *     // Example: A basic MenuTagMultiselectWidget.
  *     var widget = new OO.ui.MenuTagMultiselectWidget( {
@@ -5667,15 +5739,15 @@ OO.ui.PopupTagMultiselectWidget.prototype.addTagByPopupValue = function ( data, 
  *     } );
  *     $( 'body' ).append( widget.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets/Selects_and_Options#Menu_selects_and_options
- *
  * @class
  * @extends OO.ui.TagMultiselectWidget
  *
  * @constructor
  * @param {Object} [config] Configuration object
+ * @cfg {boolean} [clearInputOnChoose=true] Clear the text input value when a menu option is chosen
  * @cfg {Object} [menu] Configuration object for the menu widget
- * @cfg {jQuery} [$overlay] An overlay for the menu
+ * @cfg {jQuery} [$overlay] An overlay for the menu.
+ *  See <https://www.mediawiki.org/wiki/OOUI/Concepts#Overlays>.
  * @cfg {Object[]} [options=[]] Array of menu options in the format `{ data: …, label: … }`
  */
 OO.ui.MenuTagMultiselectWidget = function OoUiMenuTagMultiselectWidget( config ) {
@@ -5684,16 +5756,16 @@ OO.ui.MenuTagMultiselectWidget = function OoUiMenuTagMultiselectWidget( config )
 	// Parent constructor
 	OO.ui.MenuTagMultiselectWidget.parent.call( this, config );
 
-	this.$overlay = config.$overlay || this.$element;
-
+	this.$overlay = ( config.$overlay === true ? OO.ui.getDefaultOverlay() : config.$overlay ) || this.$element;
+	this.clearInputOnChoose = config.clearInputOnChoose === undefined || !!config.clearInputOnChoose;
 	this.menu = this.createMenuWidget( $.extend( {
 		widget: this,
 		input: this.hasInput ? this.input : null,
 		$input: this.hasInput ? this.input.$input : null,
 		filterFromInput: !!this.hasInput,
 		$autoCloseIgnore: this.hasInput ?
-			this.input.$element.add( this.$overlay ) : this.$overlay,
-		$container: this.hasInput && this.inputPosition === 'outline' ?
+			this.input.$element : $( [] ),
+		$floatableContainer: this.hasInput && this.inputPosition === 'outline' ?
 			this.input.$element : this.$element,
 		$overlay: this.$overlay,
 		disabled: this.isDisabled()
@@ -5715,6 +5787,11 @@ OO.ui.MenuTagMultiselectWidget = function OoUiMenuTagMultiselectWidget( config )
 		.append( this.menu.$element );
 	this.$element
 		.addClass( 'oo-ui-menuTagMultiselectWidget' );
+	// TagMultiselectWidget already does this, but it doesn't work right because this.menu is not yet
+	// set up while the parent constructor runs, and #getAllowedValues rejects everything.
+	if ( config.selected ) {
+		this.setValue( config.selected );
+	}
 };
 
 /* Initialization */
@@ -5746,6 +5823,7 @@ OO.ui.MenuTagMultiselectWidget.prototype.onInputFocus = function () {
  */
 OO.ui.MenuTagMultiselectWidget.prototype.onInputChange = function () {
 	this.menu.toggle( true );
+	this.initializeMenuSelection();
 };
 
 /**
@@ -5756,6 +5834,9 @@ OO.ui.MenuTagMultiselectWidget.prototype.onInputChange = function () {
 OO.ui.MenuTagMultiselectWidget.prototype.onMenuChoose = function ( menuItem ) {
 	// Add tag
 	this.addTag( menuItem.getData(), menuItem.getLabel() );
+	if ( this.hasInput && this.clearInputOnChoose ) {
+		this.input.setValue( '' );
+	}
 };
 
 /**
@@ -5767,6 +5848,8 @@ OO.ui.MenuTagMultiselectWidget.prototype.onMenuToggle = function ( isVisible ) {
 	if ( !isVisible ) {
 		this.menu.selectItem( null );
 		this.menu.highlightItem( null );
+	} else {
+		this.initializeMenuSelection();
 	}
 };
 
@@ -5774,11 +5857,16 @@ OO.ui.MenuTagMultiselectWidget.prototype.onMenuToggle = function ( isVisible ) {
  * @inheritdoc
  */
 OO.ui.MenuTagMultiselectWidget.prototype.onTagSelect = function ( tagItem ) {
-	var menuItem = this.menu.getItemFromData( tagItem.getData() );
+	var menuItem = this.menu.findItemFromData( tagItem.getData() );
 	// Override the base behavior from TagMultiselectWidget; the base behavior
 	// in TagMultiselectWidget is to remove the tag to edit it in the input,
 	// but in our case, we want to utilize the menu selection behavior, and
 	// definitely not remove the item.
+
+	// If there is an input that is used for filtering, erase the value so we don't filter
+	if ( this.hasInput && this.menu.filterFromInput ) {
+		this.input.setValue( '' );
+	}
 
 	// Select the menu item
 	this.menu.selectItem( menuItem );
@@ -5787,26 +5875,48 @@ OO.ui.MenuTagMultiselectWidget.prototype.onTagSelect = function ( tagItem ) {
 };
 
 /**
+ * Highlight the first selectable item in the menu, if configured.
+ *
+ * @private
+ * @chainable
+ */
+OO.ui.MenuTagMultiselectWidget.prototype.initializeMenuSelection = function () {
+	if ( !this.menu.findSelectedItem() ) {
+		this.menu.highlightItem( this.menu.findFirstSelectableItem() );
+	}
+};
+
+/**
  * @inheritdoc
  */
 OO.ui.MenuTagMultiselectWidget.prototype.addTagFromInput = function () {
 	var inputValue = this.input.getValue(),
-		highlightedItem = this.menu.getHighlightedItem(),
-		item = this.menu.getItemFromData( inputValue );
+		validated = false,
+		highlightedItem = this.menu.findHighlightedItem(),
+		item = this.menu.findItemFromData( inputValue );
+
+	if ( !inputValue ) {
+		return;
+	}
 
 	// Override the parent method so we add from the menu
 	// rather than directly from the input
 
 	// Look for a highlighted item first
 	if ( highlightedItem ) {
-		this.addTag( highlightedItem.getData(), highlightedItem.getLabel() );
+		validated = this.addTag( highlightedItem.getData(), highlightedItem.getLabel() );
 	} else if ( item ) {
 		// Look for the element that fits the data
-		this.addTag( item.getData(), item.getLabel() );
+		validated = this.addTag( item.getData(), item.getLabel() );
 	} else {
 		// Otherwise, add the tag - the method will only add if the
 		// tag is valid or if invalid tags are allowed
-		this.addTag( inputValue );
+		validated = this.addTag( inputValue );
+	}
+
+	if ( validated ) {
+		this.clearInput();
+		this.focus();
 	}
 };
 
@@ -5831,13 +5941,13 @@ OO.ui.MenuTagMultiselectWidget.prototype.getMenuVisibleItems = function () {
  * @return {OO.ui.MenuSelectWidget} Menu widget
  */
 OO.ui.MenuTagMultiselectWidget.prototype.createMenuWidget = function ( menuConfig ) {
-	return new OO.ui.FloatingMenuSelectWidget( menuConfig );
+	return new OO.ui.MenuSelectWidget( menuConfig );
 };
 
 /**
  * Add options to the menu
  *
- * @param {Object[]} options Object defining options
+ * @param {Object[]} menuOptions Object defining options
  */
 OO.ui.MenuTagMultiselectWidget.prototype.addOptions = function ( menuOptions ) {
 	var widget = this,
@@ -5877,36 +5987,28 @@ OO.ui.MenuTagMultiselectWidget.prototype.getMenu = function () {
  * @return {string[]} Allowed data values
  */
 OO.ui.MenuTagMultiselectWidget.prototype.getAllowedValues = function () {
-	var menuDatas = this.menu.getItems().map( function ( menuItem ) {
-		return menuItem.getData();
-	} );
-	return this.allowedValues.concat( menuDatas );
-};
-
-/**
- * @inheritdoc
- */
-OO.ui.MenuTagMultiselectWidget.prototype.focus = function () {
-	// Parent method
-	OO.ui.MenuTagMultiselectWidget.parent.prototype.focus.call( this );
-
-	if ( !this.isDisabled() ) {
-		this.menu.toggle( true );
+	var menuDatas = [];
+	if ( this.menu ) {
+		// If the parent constructor is calling us, we're not ready yet, this.menu is not set up.
+		menuDatas = this.menu.getItems().map( function ( menuItem ) {
+			return menuItem.getData();
+		} );
 	}
+	return this.allowedValues.concat( menuDatas );
 };
 
 /**
  * SelectFileWidgets allow for selecting files, using the HTML5 File API. These
  * widgets can be configured with {@link OO.ui.mixin.IconElement icons} and {@link
  * OO.ui.mixin.IndicatorElement indicators}.
- * Please see the [OOjs UI documentation on MediaWiki] [1] for more information and examples.
+ * Please see the [OOUI documentation on MediaWiki] [1] for more information and examples.
  *
  *     @example
  *     // Example of a file select widget
  *     var selectFile = new OO.ui.SelectFileWidget();
  *     $( 'body' ).append( selectFile.$element );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Widgets
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Widgets
  *
  * @class
  * @extends OO.ui.Widget
@@ -6093,8 +6195,25 @@ OO.ui.SelectFileWidget.prototype.setValue = function ( file ) {
  * @chainable
  */
 OO.ui.SelectFileWidget.prototype.focus = function () {
-	this.selectButton.$button[ 0 ].focus();
+	this.selectButton.focus();
 	return this;
+};
+
+/**
+ * Blur the widget.
+ *
+ * @chainable
+ */
+OO.ui.SelectFileWidget.prototype.blur = function () {
+	this.selectButton.blur();
+	return this;
+};
+
+/**
+ * @inheritdoc
+ */
+OO.ui.SelectFileWidget.prototype.simulateLabelClick = function () {
+	this.focus();
 };
 
 /**
@@ -6409,9 +6528,9 @@ OO.ui.SelectFileWidget.prototype.setDisabled = function ( disabled ) {
  * In general, search widgets are used inside a separate {@link OO.ui.Dialog dialog} window.
  *
  * Each time the query is changed, the search result menu is cleared and repopulated. Please see
- * the [OOjs UI demos][1] for an example.
+ * the [OOUI demos][1] for an example.
  *
- * [1]: https://tools.wmflabs.org/oojs-ui/oojs-ui/demos/#dialogs-mediawiki-vector-ltr
+ * [1]: https://doc.wikimedia.org/oojs-ui/master/demos/#SearchInputWidget-type-search
  *
  * @class
  * @extends OO.ui.Widget
@@ -6474,11 +6593,11 @@ OO.ui.SearchWidget.prototype.onQueryKeydown = function ( e ) {
 		dir = e.which === OO.ui.Keys.DOWN ? 1 : ( e.which === OO.ui.Keys.UP ? -1 : 0 );
 
 	if ( dir ) {
-		highlightedItem = this.results.getHighlightedItem();
+		highlightedItem = this.results.findHighlightedItem();
 		if ( !highlightedItem ) {
-			highlightedItem = this.results.getSelectedItem();
+			highlightedItem = this.results.findSelectedItem();
 		}
-		nextItem = this.results.getRelativeSelectableItem( highlightedItem, dir );
+		nextItem = this.results.findRelativeSelectableItem( highlightedItem, dir );
 		this.results.highlightItem( nextItem );
 		nextItem.scrollElementIntoView();
 	}
@@ -6506,7 +6625,7 @@ OO.ui.SearchWidget.prototype.onQueryChange = function () {
  * @param {string} value New value
  */
 OO.ui.SearchWidget.prototype.onQueryEnter = function () {
-	var highlightedItem = this.results.getHighlightedItem();
+	var highlightedItem = this.results.findHighlightedItem();
 	if ( highlightedItem ) {
 		this.results.chooseItem( highlightedItem );
 	}
@@ -6546,14 +6665,13 @@ OO.ui.SearchWidget.prototype.getResults = function () {
  *     $( 'body' ).append( numberInput.$element );
  *
  * @class
- * @extends OO.ui.Widget
+ * @extends OO.ui.TextInputWidget
  *
  * @constructor
  * @param {Object} [config] Configuration options
- * @cfg {Object} [input] Configuration options to pass to the {@link OO.ui.TextInputWidget text input widget}.
  * @cfg {Object} [minusButton] Configuration options to pass to the {@link OO.ui.ButtonWidget decrementing button widget}.
  * @cfg {Object} [plusButton] Configuration options to pass to the {@link OO.ui.ButtonWidget incrementing button widget}.
- * @cfg {boolean} [isInteger=false] Whether the field accepts only integer values.
+ * @cfg {boolean} [allowInteger=false] Whether the field accepts only integer values.
  * @cfg {number} [min=-Infinity] Minimum allowed value
  * @cfg {number} [max=Infinity] Maximum allowed value
  * @cfg {number} [step=1] Delta when using the buttons or up/down arrow keys
@@ -6561,9 +6679,12 @@ OO.ui.SearchWidget.prototype.getResults = function () {
  * @cfg {boolean} [showButtons=true] Whether to show the plus and minus buttons.
  */
 OO.ui.NumberInputWidget = function OoUiNumberInputWidget( config ) {
+	var $field = $( '<div>' )
+		.addClass( 'oo-ui-numberInputWidget-field' );
+
 	// Configuration initialization
 	config = $.extend( {
-		isInteger: false,
+		allowInteger: false,
 		min: -Infinity,
 		max: Infinity,
 		step: 1,
@@ -6571,24 +6692,22 @@ OO.ui.NumberInputWidget = function OoUiNumberInputWidget( config ) {
 		showButtons: true
 	}, config );
 
-	// Parent constructor
-	OO.ui.NumberInputWidget.parent.call( this, config );
+	// For backward compatibility
+	$.extend( config, config.input );
+	this.input = this;
 
-	// Properties
-	this.input = new OO.ui.TextInputWidget( $.extend(
-		{
-			disabled: this.isDisabled(),
-			type: 'number'
-		},
-		config.input
-	) );
+	// Parent constructor
+	OO.ui.NumberInputWidget.parent.call( this, $.extend( config, {
+		type: 'number'
+	} ) );
+
 	if ( config.showButtons ) {
 		this.minusButton = new OO.ui.ButtonWidget( $.extend(
 			{
 				disabled: this.isDisabled(),
 				tabIndex: -1,
 				classes: [ 'oo-ui-numberInputWidget-minusButton' ],
-				label: '−'
+				icon: 'subtract'
 			},
 			config.minusButton
 		) );
@@ -6597,18 +6716,14 @@ OO.ui.NumberInputWidget = function OoUiNumberInputWidget( config ) {
 				disabled: this.isDisabled(),
 				tabIndex: -1,
 				classes: [ 'oo-ui-numberInputWidget-plusButton' ],
-				label: '+'
+				icon: 'add'
 			},
 			config.plusButton
 		) );
 	}
 
 	// Events
-	this.input.connect( this, {
-		change: this.emit.bind( this, 'change' ),
-		enter: this.emit.bind( this, 'enter' )
-	} );
-	this.input.$input.on( {
+	this.$input.on( {
 		keydown: this.onKeyDown.bind( this ),
 		'wheel mousewheel DOMMouseScroll': this.onWheel.bind( this )
 	} );
@@ -6621,40 +6736,31 @@ OO.ui.NumberInputWidget = function OoUiNumberInputWidget( config ) {
 		} );
 	}
 
-	// Initialization
-	this.setIsInteger( !!config.isInteger );
-	this.setRange( config.min, config.max );
-	this.setStep( config.step, config.pageStep );
-
-	this.$field = $( '<div>' ).addClass( 'oo-ui-numberInputWidget-field' )
-		.append( this.input.$element );
-	this.$element.addClass( 'oo-ui-numberInputWidget' ).append( this.$field );
+	// Build the field
+	$field.append( this.$input );
 	if ( config.showButtons ) {
-		this.$field
+		$field
 			.prepend( this.minusButton.$element )
 			.append( this.plusButton.$element );
-		this.$element.addClass( 'oo-ui-numberInputWidget-buttoned' );
 	}
-	this.input.setValidation( this.validateNumber.bind( this ) );
+
+	// Initialization
+	this.setAllowInteger( config.allowInteger || config.isInteger );
+	this.setRange( config.min, config.max );
+	this.setStep( config.step, config.pageStep );
+	// Set the validation method after we set allowInteger and range
+	// so that it doesn't immediately call setValidityFlag
+	this.setValidation( this.validateNumber.bind( this ) );
+
+	this.$element
+		.addClass( 'oo-ui-numberInputWidget' )
+		.toggleClass( 'oo-ui-numberInputWidget-buttoned', config.showButtons )
+		.append( $field );
 };
 
 /* Setup */
 
-OO.inheritClass( OO.ui.NumberInputWidget, OO.ui.Widget );
-
-/* Events */
-
-/**
- * A `change` event is emitted when the value of the input changes.
- *
- * @event change
- */
-
-/**
- * An `enter` event is emitted when the user presses 'enter' inside the text box.
- *
- * @event enter
- */
+OO.inheritClass( OO.ui.NumberInputWidget, OO.ui.TextInputWidget );
 
 /* Methods */
 
@@ -6663,19 +6769,23 @@ OO.inheritClass( OO.ui.NumberInputWidget, OO.ui.Widget );
  *
  * @param {boolean} flag
  */
-OO.ui.NumberInputWidget.prototype.setIsInteger = function ( flag ) {
-	this.isInteger = !!flag;
-	this.input.setValidityFlag();
+OO.ui.NumberInputWidget.prototype.setAllowInteger = function ( flag ) {
+	this.allowInteger = !!flag;
+	this.setValidityFlag();
 };
+// Backward compatibility
+OO.ui.NumberInputWidget.prototype.setIsInteger = OO.ui.NumberInputWidget.prototype.setAllowInteger;
 
 /**
  * Get whether only integers are allowed
  *
  * @return {boolean} Flag value
  */
-OO.ui.NumberInputWidget.prototype.getIsInteger = function () {
-	return this.isInteger;
+OO.ui.NumberInputWidget.prototype.getAllowInteger = function () {
+	return this.allowInteger;
 };
+// Backward compatibility
+OO.ui.NumberInputWidget.prototype.getIsInteger = OO.ui.NumberInputWidget.prototype.getAllowInteger;
 
 /**
  * Set the range of allowed values
@@ -6689,7 +6799,7 @@ OO.ui.NumberInputWidget.prototype.setRange = function ( min, max ) {
 	}
 	this.min = min;
 	this.max = max;
-	this.input.setValidityFlag();
+	this.setValidityFlag();
 };
 
 /**
@@ -6730,30 +6840,12 @@ OO.ui.NumberInputWidget.prototype.getStep = function () {
 };
 
 /**
- * Get the current value of the widget
- *
- * @return {string}
- */
-OO.ui.NumberInputWidget.prototype.getValue = function () {
-	return this.input.getValue();
-};
-
-/**
  * Get the current value of the widget as a number
  *
  * @return {number} May be NaN, or an invalid number
  */
 OO.ui.NumberInputWidget.prototype.getNumericValue = function () {
-	return +this.input.getValue();
-};
-
-/**
- * Set the value of the widget
- *
- * @param {string} value Invalid values are allowed
- */
-OO.ui.NumberInputWidget.prototype.setValue = function ( value ) {
-	this.input.setValue( value );
+	return +this.getValue();
 };
 
 /**
@@ -6774,7 +6866,7 @@ OO.ui.NumberInputWidget.prototype.adjustValue = function ( delta ) {
 	} else {
 		n = v + delta;
 		n = Math.max( Math.min( n, this.max ), this.min );
-		if ( this.isInteger ) {
+		if ( this.allowInteger ) {
 			n = Math.round( n );
 		}
 	}
@@ -6783,7 +6875,6 @@ OO.ui.NumberInputWidget.prototype.adjustValue = function ( delta ) {
 		this.setValue( n );
 	}
 };
-
 /**
  * Validate input
  *
@@ -6793,11 +6884,15 @@ OO.ui.NumberInputWidget.prototype.adjustValue = function ( delta ) {
  */
 OO.ui.NumberInputWidget.prototype.validateNumber = function ( value ) {
 	var n = +value;
+	if ( value === '' ) {
+		return !this.isRequired();
+	}
+
 	if ( isNaN( n ) || !isFinite( n ) ) {
 		return false;
 	}
 
-	if ( this.isInteger && Math.floor( n ) !== n ) {
+	if ( this.allowInteger && Math.floor( n ) !== n ) {
 		return false;
 	}
 
@@ -6827,7 +6922,7 @@ OO.ui.NumberInputWidget.prototype.onButtonClick = function ( dir ) {
 OO.ui.NumberInputWidget.prototype.onWheel = function ( event ) {
 	var delta = 0;
 
-	if ( !this.isDisabled() && this.input.$input.is( ':focus' ) ) {
+	if ( !this.isDisabled() && this.$input.is( ':focus' ) ) {
 		// Standard 'wheel' event
 		if ( event.originalEvent.deltaMode !== undefined ) {
 			this.sawWheelEvent = true;
@@ -6892,9 +6987,6 @@ OO.ui.NumberInputWidget.prototype.setDisabled = function ( disabled ) {
 	// Parent method
 	OO.ui.NumberInputWidget.parent.prototype.setDisabled.call( this, disabled );
 
-	if ( this.input ) {
-		this.input.setDisabled( this.isDisabled() );
-	}
 	if ( this.minusButton ) {
 		this.minusButton.setDisabled( this.isDisabled() );
 	}
@@ -6906,3 +6998,5 @@ OO.ui.NumberInputWidget.prototype.setDisabled = function ( disabled ) {
 };
 
 }( OO ) );
+
+//# sourceMappingURL=oojs-ui-widgets.js.map

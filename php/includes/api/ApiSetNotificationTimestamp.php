@@ -3,9 +3,7 @@
 /**
  * API for MediaWiki 1.14+
  *
- * Created on Jun 18, 2012
- *
- * Copyright © 2012 Brad Jorsch
+ * Copyright © 2012 Wikimedia Foundation and contributors
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,7 +30,7 @@ use MediaWiki\MediaWikiServices;
  */
 class ApiSetNotificationTimestamp extends ApiBase {
 
-	private $mPageSet;
+	private $mPageSet = null;
 
 	public function execute() {
 		$user = $this->getUser();
@@ -150,7 +148,7 @@ class ApiSetNotificationTimestamp extends ApiBase {
 				);
 
 				// Now, put the valid titles into the result
-				/** @var $title Title */
+				/** @var Title $title */
 				foreach ( $pageSet->getTitles() as $title ) {
 					$ns = $title->getNamespace();
 					$dbkey = $title->getDBkey();
@@ -189,7 +187,7 @@ class ApiSetNotificationTimestamp extends ApiBase {
 	 * @return ApiPageSet
 	 */
 	private function getPageSet() {
-		if ( !isset( $this->mPageSet ) ) {
+		if ( $this->mPageSet === null ) {
 			$this->mPageSet = new ApiPageSet( $this );
 		}
 

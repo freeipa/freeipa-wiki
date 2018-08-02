@@ -88,7 +88,7 @@ class BitmapHandler extends TransformationalImageHandler {
 
 	/**
 	 * @param File $image
-	 * @param array $params
+	 * @param array &$params
 	 * @return bool
 	 */
 	function normaliseParams( $image, &$params ) {
@@ -112,14 +112,14 @@ class BitmapHandler extends TransformationalImageHandler {
 	 */
 	protected function imageMagickSubsampling( $pixelFormat ) {
 		switch ( $pixelFormat ) {
-		case 'yuv444':
-			return [ '1x1', '1x1', '1x1' ];
-		case 'yuv422':
-			return [ '2x1', '1x1', '1x1' ];
-		case 'yuv420':
-			return [ '2x2', '1x1', '1x1' ];
-		default:
-			throw new MWException( 'Invalid pixel format for JPEG output' );
+			case 'yuv444':
+				return [ '1x1', '1x1', '1x1' ];
+			case 'yuv422':
+				return [ '2x1', '1x1', '1x1' ];
+			case 'yuv420':
+				return [ '2x2', '1x1', '1x1' ];
+			default:
+				throw new MWException( 'Invalid pixel format for JPEG output' );
 		}
 	}
 
@@ -129,7 +129,7 @@ class BitmapHandler extends TransformationalImageHandler {
 	 * @param File $image File associated with this thumbnail
 	 * @param array $params Array with scaler params
 	 *
-	 * @return MediaTransformError Error object if error occurred, false (=no error) otherwise
+	 * @return MediaTransformError|bool Error object if error occurred, false (=no error) otherwise
 	 */
 	protected function transformImageMagick( $image, $params ) {
 		# use ImageMagick
@@ -203,9 +203,9 @@ class BitmapHandler extends TransformationalImageHandler {
 				'-layers', 'merge',
 				'-background', 'white',
 			];
-			MediaWiki\suppressWarnings();
+			Wikimedia\suppressWarnings();
 			$xcfMeta = unserialize( $image->getMetadata() );
-			MediaWiki\restoreWarnings();
+			Wikimedia\restoreWarnings();
 			if ( $xcfMeta
 				&& isset( $xcfMeta['colorType'] )
 				&& $xcfMeta['colorType'] === 'greyscale-alpha'
@@ -272,7 +272,7 @@ class BitmapHandler extends TransformationalImageHandler {
 	 * @param File $image File associated with this thumbnail
 	 * @param array $params Array with scaler params
 	 *
-	 * @return MediaTransformError Error object if error occurred, false (=no error) otherwise
+	 * @return MediaTransformError Error|bool object if error occurred, false (=no error) otherwise
 	 */
 	protected function transformImageMagickExt( $image, $params ) {
 		global $wgSharpenReductionThreshold, $wgSharpenParameter, $wgMaxAnimatedGifArea,
@@ -367,7 +367,7 @@ class BitmapHandler extends TransformationalImageHandler {
 	 * @param File $image File associated with this thumbnail
 	 * @param array $params Array with scaler params
 	 *
-	 * @return MediaTransformError Error object if error occurred, false (=no error) otherwise
+	 * @return MediaTransformError Error|bool object if error occurred, false (=no error) otherwise
 	 */
 	protected function transformCustom( $image, $params ) {
 		# Use a custom convert command
@@ -399,7 +399,7 @@ class BitmapHandler extends TransformationalImageHandler {
 	 * @param File $image File associated with this thumbnail
 	 * @param array $params Array with scaler params
 	 *
-	 * @return MediaTransformError Error object if error occurred, false (=no error) otherwise
+	 * @return MediaTransformError|bool Error object if error occurred, false (=no error) otherwise
 	 */
 	protected function transformGd( $image, $params ) {
 		# Use PHP's builtin GD library functions.
@@ -436,6 +436,14 @@ class BitmapHandler extends TransformationalImageHandler {
 			$err = "File seems to be missing: {$params['srcPath']}";
 			wfDebug( "$err\n" );
 			$errMsg = wfMessage( 'thumbnail_image-missing', $params['srcPath'] )->text();
+
+			return $this->getMediaTransformError( $params, $errMsg );
+		}
+
+		if ( filesize( $params['srcPath'] ) === 0 ) {
+			$err = "Image file size seems to be zero.";
+			wfDebug( "$err\n" );
+			$errMsg = wfMessage( 'thumbnail_image-size-zero', $params['srcPath'] )->text();
 
 			return $this->getMediaTransformError( $params, $errMsg );
 		}

@@ -89,7 +89,7 @@
 	 *     calendar uses relative positioning.
 	 */
 	mw.widgets.DateInputWidget = function MWWDateInputWidget( config ) {
-		var placeholderDateFormat, mustBeAfter, mustBeBefore;
+		var placeholderDateFormat, mustBeAfter, mustBeBefore, $overlay;
 
 		// Config initialization
 		config = $.extend( {
@@ -130,6 +130,7 @@
 		} );
 		this.inCalendar = 0;
 		this.inTextInput = 0;
+		this.closing = false;
 		this.inputFormat = config.inputFormat;
 		this.displayFormat = config.displayFormat;
 		this.longDisplayFormat = config.longDisplayFormat;
@@ -172,7 +173,8 @@
 		} );
 		this.$handle.on( {
 			click: this.onClick.bind( this ),
-			keypress: this.onKeyPress.bind( this )
+			keypress: this.onKeyPress.bind( this ),
+			focus: this.onFocus.bind( this )
 		} );
 
 		// Initialization
@@ -187,14 +189,11 @@
 			.addClass( 'mw-widget-dateInputWidget' )
 			.append( this.$handle, this.textInput.$element, this.calendar.$element );
 
-		// config.overlay is the selector to be used for config.$overlay, specified from PHP
-		if ( config.overlay ) {
-			config.$overlay = $( config.overlay );
-		}
+		$overlay = config.$overlay === true ? OO.ui.getDefaultOverlay() : config.$overlay;
 
-		if ( config.$overlay ) {
+		if ( $overlay ) {
 			this.calendar.setFloatableContainer( this.$element );
-			config.$overlay.append( this.calendar.$element );
+			$overlay.append( this.calendar.$element );
 
 			// The text input and calendar are not in DOM order, so fix up focus transitions.
 			this.textInput.$input.on( 'keydown', function ( e ) {
@@ -240,6 +239,16 @@
 
 	OO.inheritClass( mw.widgets.DateInputWidget, OO.ui.TextInputWidget );
 	OO.mixinClass( mw.widgets.DateInputWidget, OO.ui.mixin.IndicatorElement );
+
+	/* Events */
+
+	/**
+	 * Fired when the widget is deactivated (i.e. the calendar is closed). This can happen because
+	 * the user selected a value, or because the user blurred the widget.
+	 *
+	 * @event deactivate
+	 * @param {boolean} userSelected Whether the deactivation happened because the user selected a value
+	 */
 
 	/* Methods */
 
@@ -385,13 +394,23 @@
 	 * Deactivate this input field for data entry. Closes the calendar and hides the text field.
 	 *
 	 * @private
+	 * @param {boolean} [userSelected] Whether we are deactivating because the user selected a value
 	 */
-	mw.widgets.DateInputWidget.prototype.deactivate = function () {
+	mw.widgets.DateInputWidget.prototype.deactivate = function ( userSelected ) {
 		this.$element.removeClass( 'mw-widget-dateInputWidget-active' );
 		this.$handle.show();
 		this.textInput.toggle( false );
 		this.calendar.toggle( false );
 		this.setValidityFlag();
+
+		if ( userSelected ) {
+			// Prevent focusing the handle from reopening the calendar
+			this.closing = true;
+			this.$handle.focus();
+			this.closing = false;
+		}
+
+		this.emit( 'deactivate', !!userSelected );
 	};
 
 	/**
@@ -443,7 +462,8 @@
 			format = llll.replace( lll.replace( ll, '' ), '' );
 
 			if ( this.longDisplayFormat ) {
-				format = format.replace( 'MMM', 'MMMM' ).replace( 'ddd', 'dddd' );
+				// Replace MMM to MMMM and ddd to dddd but don't change MMMM and dddd
+				format = format.replace( /MMMM?/, 'MMMM' ).replace( /dddd?/, 'dddd' );
 			}
 
 			return format;
@@ -521,6 +541,17 @@
 	};
 
 	/**
+	 * Handle focus events.
+	 *
+	 * @private
+	 */
+	mw.widgets.DateInputWidget.prototype.onFocus = function () {
+		if ( !this.closing ) {
+			this.activate();
+		}
+	};
+
+	/**
 	 * Handle calendar key press events.
 	 *
 	 * @private
@@ -529,8 +560,7 @@
 	 */
 	mw.widgets.DateInputWidget.prototype.onCalendarKeyPress = function ( e ) {
 		if ( !this.isDisabled() && e.which === OO.ui.Keys.ENTER ) {
-			this.deactivate();
-			this.$handle.focus();
+			this.deactivate( true );
 			return false;
 		}
 	};
@@ -543,13 +573,15 @@
 	 * @return {boolean} False to cancel the default event
 	 */
 	mw.widgets.DateInputWidget.prototype.onCalendarClick = function ( e ) {
+		var targetClass = this.calendar.getPrecision() === 'month' ?
+			'mw-widget-calendarWidget-month' :
+			'mw-widget-calendarWidget-day';
 		if (
 			!this.isDisabled() &&
 			e.which === 1 &&
-			$( e.target ).hasClass( 'mw-widget-calendarWidget-day' )
+			$( e.target ).hasClass( targetClass )
 		) {
-			this.deactivate();
-			this.$handle.focus();
+			this.deactivate( true );
 			return false;
 		}
 	};
@@ -560,8 +592,7 @@
 	 * @private
 	 */
 	mw.widgets.DateInputWidget.prototype.onEnter = function () {
-		this.deactivate();
-		this.$handle.focus();
+		this.deactivate( true );
 	};
 
 	/**

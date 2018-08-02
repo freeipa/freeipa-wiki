@@ -148,7 +148,7 @@ abstract class File implements IDBAccessObject {
 	protected $isSafeFile;
 
 	/** @var string Required Repository class type */
-	protected $repoClass = 'FileRepo';
+	protected $repoClass = FileRepo::class;
 
 	/** @var array Cache of tmp filepaths pointing to generated bucket thumbnails, keyed by width */
 	protected $tmpBucketedThumbCache = [];
@@ -250,7 +250,7 @@ abstract class File implements IDBAccessObject {
 		$oldMime = $old->getMimeType();
 		$n = strrpos( $new, '.' );
 		$newExt = self::normalizeExtension( $n ? substr( $new, $n + 1 ) : '' );
-		$mimeMagic = MimeMagic::singleton();
+		$mimeMagic = MediaWiki\MediaWikiServices::getInstance()->getMimeAnalyzer();
 
 		return $mimeMagic->isMatchingExtension( $newExt, $oldMime );
 	}
@@ -268,7 +268,7 @@ abstract class File implements IDBAccessObject {
 	 * a two-part name, set the minor type to 'unknown'.
 	 *
 	 * @param string $mime "text/html" etc
-	 * @return array ("text", "html") etc
+	 * @return string[] ("text", "html") etc
 	 */
 	public static function splitMime( $mime ) {
 		if ( strpos( $mime, '/' ) !== false ) {
@@ -355,7 +355,7 @@ abstract class File implements IDBAccessObject {
 		return $this->url;
 	}
 
-	/*
+	/**
 	 * Get short description URL for a files based on the page ID
 	 *
 	 * @return string|null
@@ -569,7 +569,7 @@ abstract class File implements IDBAccessObject {
 	 * format does not support that sort of thing, returns
 	 * an empty array.
 	 *
-	 * @return array
+	 * @return string[]
 	 * @since 1.23
 	 */
 	public function getAvailableLanguages() {
@@ -578,6 +578,25 @@ abstract class File implements IDBAccessObject {
 			return $handler->getAvailableLanguages( $this );
 		} else {
 			return [];
+		}
+	}
+
+	/**
+	 * Get the language code from the available languages for this file that matches the language
+	 * requested by the user
+	 *
+	 * @param string $userPreferredLanguage
+	 * @return string|null
+	 */
+	public function getMatchedLanguage( $userPreferredLanguage ) {
+		$handler = $this->getHandler();
+		if ( $handler && method_exists( $handler, 'getMatchedLanguage' ) ) {
+			return $handler->getMatchedLanguage(
+				$userPreferredLanguage,
+				$handler->getAvailableLanguages( $this )
+			);
+		} else {
+			return null;
 		}
 	}
 
@@ -862,7 +881,7 @@ abstract class File implements IDBAccessObject {
 	 *
 	 * Overridden by LocalFile to actually query the DB
 	 *
-	 * @param integer $flags Bitfield of File::READ_* constants
+	 * @param int $flags Bitfield of File::READ_* constants
 	 */
 	public function load( $flags = 0 ) {
 	}
@@ -1147,7 +1166,7 @@ abstract class File implements IDBAccessObject {
 		if ( !$thumb ) { // bad params?
 			$thumb = false;
 		} elseif ( $thumb->isError() ) { // transform error
-			/** @var $thumb MediaTransformError */
+			/** @var MediaTransformError $thumb */
 			$this->lastError = $thumb->toText();
 			// Ignore errors if requested
 			if ( $wgIgnoreImageErrors && !( $flags & self::RENDER_NOW ) ) {
@@ -1282,11 +1301,10 @@ abstract class File implements IDBAccessObject {
 		// Thumbnailing a very large file could result in network saturation if
 		// everyone does it at once.
 		if ( $this->getSize() >= 1e7 ) { // 10MB
-			$that = $this;
 			$work = new PoolCounterWorkViaCallback( 'GetLocalFileCopy', sha1( $this->getName() ),
 				[
-					'doWork' => function () use ( $that ) {
-						return $that->getLocalRefPath();
+					'doWork' => function () {
+						return $this->getLocalRefPath();
 					}
 				]
 			);
@@ -1405,7 +1423,7 @@ abstract class File implements IDBAccessObject {
 	 * Get all thumbnail names previously generated for this file
 	 * STUB
 	 * Overridden by LocalFile
-	 * @return array
+	 * @return string[]
 	 */
 	function getThumbnails() {
 		return [];
@@ -1446,7 +1464,9 @@ abstract class File implements IDBAccessObject {
 		// Purge cache of all pages using this file
 		$title = $this->getTitle();
 		if ( $title ) {
-			DeferredUpdates::addUpdate( new HTMLCacheUpdate( $title, 'imagelinks' ) );
+			DeferredUpdates::addUpdate(
+				new HTMLCacheUpdate( $title, 'imagelinks', 'file-purge' )
+			);
 		}
 	}
 
@@ -1454,9 +1474,9 @@ abstract class File implements IDBAccessObject {
 	 * Return a fragment of the history of file.
 	 *
 	 * STUB
-	 * @param int $limit Limit of rows to return
-	 * @param string $start Only revisions older than $start will be returned
-	 * @param string $end Only revisions newer than $end will be returned
+	 * @param int|null $limit Limit of rows to return
+	 * @param string|int|null $start Only revisions older than $start will be returned
+	 * @param string|int|null $end Only revisions newer than $end will be returned
 	 * @param bool $inc Include the endpoints of the time range
 	 *
 	 * @return File[]
@@ -2079,9 +2099,9 @@ abstract class File implements IDBAccessObject {
 	 *   File::FOR_PUBLIC       to be displayed to all users
 	 *   File::FOR_THIS_USER    to be displayed to the given user
 	 *   File::RAW              get the description regardless of permissions
-	 * @param User $user User object to check for, only if FOR_THIS_USER is
+	 * @param User|null $user User object to check for, only if FOR_THIS_USER is
 	 *   passed to the $audience parameter
-	 * @return string
+	 * @return null|string
 	 */
 	function getDescription( $audience = self::FOR_PUBLIC, User $user = null ) {
 		return null;
@@ -2141,7 +2161,7 @@ abstract class File implements IDBAccessObject {
 	 * field of this file, if it's marked as deleted.
 	 * STUB
 	 * @param int $field
-	 * @param User $user User object to check, or null to use $wgUser
+	 * @param User|null $user User object to check, or null to use $wgUser
 	 * @return bool
 	 */
 	function userCan( $field, User $user = null ) {
@@ -2149,15 +2169,34 @@ abstract class File implements IDBAccessObject {
 	}
 
 	/**
-	 * @return array HTTP header name/value map to use for HEAD/GET request responses
+	 * @deprecated since 1.30, use File::getContentHeaders instead
 	 */
 	function getStreamHeaders() {
+		wfDeprecated( __METHOD__, '1.30' );
+		return $this->getContentHeaders();
+	}
+
+	/**
+	 * @return string[] HTTP header name/value map to use for HEAD/GET request responses
+	 * @since 1.30
+	 */
+	function getContentHeaders() {
 		$handler = $this->getHandler();
 		if ( $handler ) {
-			return $handler->getStreamHeaders( $this->getMetadata() );
-		} else {
-			return [];
+			$metadata = $this->getMetadata();
+
+			if ( is_string( $metadata ) ) {
+				$metadata = Wikimedia\quietCall( 'unserialize', $metadata );
+			}
+
+			if ( !is_array( $metadata ) ) {
+				$metadata = [];
+			}
+
+			return $handler->getContentHeaders( $metadata );
 		}
+
+		return [];
 	}
 
 	/**

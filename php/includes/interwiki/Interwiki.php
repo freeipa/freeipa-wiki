@@ -32,7 +32,7 @@ class Interwiki {
 	/** @var string The URL of the wiki, with "$1" as a placeholder for an article name. */
 	protected $mURL;
 
-	/** @var string The URL of the file api.php  */
+	/** @var string The URL of the file api.php */
 	protected $mAPI;
 
 	/** @var string The name of the database (for a connection to be established
@@ -88,16 +88,16 @@ class Interwiki {
 	 * @since 1.26
 	 */
 	public static function invalidateCache( $prefix ) {
-		return MediaWikiServices::getInstance()->getInterwikiLookup()->invalidateCache( $prefix );
+		MediaWikiServices::getInstance()->getInterwikiLookup()->invalidateCache( $prefix );
 	}
 
 	/**
-	 * Returns all interwiki prefixes
+	 * Returns all interwiki prefix definitions.
 	 *
 	 * @deprecated since 1.28, unused. Use InterwikiLookup instead.
 	 *
 	 * @param string|null $local If set, limits output to local/non-local interwikis
-	 * @return array List of prefixes
+	 * @return array[] List of interwiki rows
 	 * @since 1.19
 	 */
 	public static function getAllPrefixes( $local = null ) {

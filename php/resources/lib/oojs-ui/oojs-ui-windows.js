@@ -1,12 +1,12 @@
 /*!
- * OOjs UI v0.21.1
- * https://www.mediawiki.org/wiki/OOjs_UI
+ * OOUI v0.26.4
+ * https://www.mediawiki.org/wiki/OOUI
  *
- * Copyright 2011–2017 OOjs UI Team and other contributors.
+ * Copyright 2011–2018 OOUI Team and other contributors.
  * Released under the MIT license
  * http://oojs.mit-license.org
  *
- * Date: 2017-04-18T23:32:49Z
+ * Date: 2018-04-17T22:23:58Z
  */
 ( function ( OO ) {
 
@@ -18,10 +18,10 @@
  * of the actions.
  *
  * Both actions and action sets are primarily used with {@link OO.ui.Dialog Dialogs}.
- * Please see the [OOjs UI documentation on MediaWiki] [1] for more information
+ * Please see the [OOUI documentation on MediaWiki] [1] for more information
  * and examples.
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs#Action_sets
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs#Action_sets
  *
  * @class
  * @extends OO.ui.ButtonWidget
@@ -105,7 +105,7 @@ OO.ui.ActionWidget.prototype.getModes = function () {
  * - Special: Special actions are the first visible actions with special flags, such as 'safe' and 'primary', the default special flags. Additional special flags can be configured in subclasses with the static #specialFlags property.
  * - Other: Other actions include all non-special visible actions.
  *
- * Please see the [OOjs UI documentation on MediaWiki][1] for more information.
+ * See the [OOUI documentation on MediaWiki][1] for more information.
  *
  *     @example
  *     // Example: An action set used in a process dialog
@@ -117,7 +117,7 @@ OO.ui.ActionWidget.prototype.getModes = function () {
  *     MyProcessDialog.static.name = 'myProcessDialog';
  *     // An action set that uses modes ('edit' and 'help' mode, in this example).
  *     MyProcessDialog.static.actions = [
- *         { action: 'continue', modes: 'edit', label: 'Continue', flags: [ 'primary', 'constructive' ] },
+ *         { action: 'continue', modes: 'edit', label: 'Continue', flags: [ 'primary', 'progressive' ] },
  *         { action: 'help', modes: 'edit', label: 'Help' },
  *         { modes: 'edit', label: 'Cancel', flags: 'safe' },
  *         { action: 'back', modes: 'help', label: 'Back', flags: 'safe' }
@@ -166,7 +166,7 @@ OO.ui.ActionWidget.prototype.getModes = function () {
  *     windowManager.addWindows( [ dialog ] );
  *     windowManager.openWindow( dialog );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs#Action_sets
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs#Action_sets
  *
  * @abstract
  * @class
@@ -207,9 +207,9 @@ OO.mixinClass( OO.ui.ActionSet, OO.EventEmitter );
 /**
  * Symbolic name of the flags used to identify special actions. Special actions are displayed in the
  *  header of a {@link OO.ui.ProcessDialog process dialog}.
- *  See the [OOjs UI documentation on MediaWiki][2] for more information and examples.
+ *  See the [OOUI documentation on MediaWiki][2] for more information and examples.
  *
- *  [2]:https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs
+ *  [2]:https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs
  *
  * @abstract
  * @static
@@ -605,9 +605,9 @@ OO.ui.ActionSet.prototype.organize = function () {
  * If the error is a warning, the error interface will include a 'Dismiss' and a 'Continue' button, which will try the
  * process again.
  *
- * For an example of error interfaces, please see the [OOjs UI documentation on MediaWiki][1].
+ * For an example of error interfaces, please see the [OOUI documentation on MediaWiki][1].
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs#Processes_and_errors
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs#Processes_and_errors
  *
  * @class
  *
@@ -852,6 +852,105 @@ OO.ui.Process.prototype.next = function ( step, context ) {
 };
 
 /**
+ * A window instance represents the life cycle for one single opening of a window
+ * until its closing.
+ *
+ * While OO.ui.WindowManager will reuse OO.ui.Window objects, each time a window is
+ * opened, a new lifecycle starts.
+ *
+ * For more information, please see the [OOUI documentation on MediaWiki] [1].
+ *
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows
+ *
+ * @class
+ *
+ * @constructor
+ */
+OO.ui.WindowInstance = function OOuiWindowInstance() {
+	var deferreds = {
+		opening: $.Deferred(),
+		opened: $.Deferred(),
+		closing: $.Deferred(),
+		closed: $.Deferred()
+	};
+
+	/**
+	 * @private
+	 * @property {Object}
+	 */
+	this.deferreds = deferreds;
+
+	// Set these up as chained promises so that rejecting of
+	// an earlier stage automatically rejects the subsequent
+	// would-be stages as well.
+
+	/**
+	 * @property {jQuery.Promise}
+	 */
+	this.opening = deferreds.opening.promise();
+	/**
+	 * @property {jQuery.Promise}
+	 */
+	this.opened = this.opening.then( function () {
+		return deferreds.opened;
+	} );
+	/**
+	 * @property {jQuery.Promise}
+	 */
+	this.closing = this.opened.then( function () {
+		return deferreds.closing;
+	} );
+	/**
+	 * @property {jQuery.Promise}
+	 */
+	this.closed = this.closing.then( function () {
+		return deferreds.closed;
+	} );
+};
+
+/* Setup */
+
+OO.initClass( OO.ui.WindowInstance );
+
+/**
+ * Check if window is opening.
+ *
+ * @return {boolean} Window is opening
+ */
+OO.ui.WindowInstance.prototype.isOpening = function () {
+	return this.deferreds.opened.state() === 'pending';
+};
+
+/**
+ * Check if window is opened.
+ *
+ * @return {boolean} Window is opened
+ */
+OO.ui.WindowInstance.prototype.isOpened = function () {
+	return this.deferreds.opened.state() === 'resolved' &&
+		this.deferreds.closing.state() === 'pending';
+};
+
+/**
+ * Check if window is closing.
+ *
+ * @return {boolean} Window is closing
+ */
+OO.ui.WindowInstance.prototype.isClosing = function () {
+	return this.deferreds.closing.state() === 'resolved' &&
+		this.deferreds.closed.state() === 'pending';
+};
+
+/**
+ * Check if window is closed.
+ *
+ * @return {boolean} Window is closed
+ */
+OO.ui.WindowInstance.prototype.isClosed = function () {
+	return this.deferreds.closed.state() === 'resolved';
+};
+
+/**
  * Window managers are used to open and close {@link OO.ui.Window windows} and control their presentation.
  * Managed windows are mutually exclusive. If a new window is opened while a current window is opening
  * or is opened, the current window will be closed and any ongoing {@link OO.ui.Process process} will be cancelled. Windows
@@ -865,13 +964,11 @@ OO.ui.Process.prototype.next = function ( step, context ) {
  * {@link OO.ui.Window#open open} method is used, and the window manager begins to open the window.
  *
  * - an `opening` event is emitted with an `opening` promise
- * - the #getSetupDelay method is called and the returned value is used to time a pause in execution before
- *   the window’s {@link OO.ui.Window#getSetupProcess getSetupProcess} method is called on the
- *   window and its result executed
+ * - the #getSetupDelay method is called and the returned value is used to time a pause in execution before the
+ *   window’s {@link OO.ui.Window#method-setup setup} method is called which executes OO.ui.Window#getSetupProcess.
  * - a `setup` progress notification is emitted from the `opening` promise
- * - the #getReadyDelay method is called the returned value is used to time a pause in execution before
- *   the window’s {@link OO.ui.Window#getReadyProcess getReadyProcess} method is called on the
- *   window and its result executed
+ * - the #getReadyDelay method is called the returned value is used to time a pause in execution before the
+ *   window’s {@link OO.ui.Window#method-ready ready} method is called which executes OO.ui.Window#getReadyProcess.
  * - a `ready` progress notification is emitted from the `opening` promise
  * - the `opening` promise is resolved with an `opened` promise
  *
@@ -892,9 +989,9 @@ OO.ui.Process.prototype.next = function ( step, context ) {
  * - a `teardown` progress notification is emitted from the `closing` promise
  * - the `closing` promise is resolved. The window is now closed
  *
- * See the [OOjs UI documentation on MediaWiki][1] for more information.
+ * See the [OOUI documentation on MediaWiki][1] for more information.
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Window_managers
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Window_managers
  *
  * @class
  * @extends OO.ui.Element
@@ -921,9 +1018,9 @@ OO.ui.WindowManager = function OoUiWindowManager( config ) {
 	this.factory = config.factory;
 	this.modal = config.modal === undefined || !!config.modal;
 	this.windows = {};
-	this.opening = null;
-	this.opened = null;
-	this.closing = null;
+	// Deprecated placeholder promise given to compatOpening in openWindow()
+	// that is resolved in closeWindow().
+	this.compatOpened = null;
 	this.preparingToOpen = null;
 	this.preparingToClose = null;
 	this.currentWindow = null;
@@ -937,6 +1034,7 @@ OO.ui.WindowManager = function OoUiWindowManager( config ) {
 	// Initialization
 	this.$element
 		.addClass( 'oo-ui-windowManager' )
+		.attr( 'aria-hidden', true )
 		.toggleClass( 'oo-ui-windowManager-modal', this.modal );
 };
 
@@ -952,9 +1050,9 @@ OO.mixinClass( OO.ui.WindowManager, OO.EventEmitter );
  *
  * @event opening
  * @param {OO.ui.Window} win Window that's being opened
- * @param {jQuery.Promise} opening An `opening` promise resolved with a value when the window is opened successfully.
- *  When the `opening` promise is resolved, the first argument of the value is an 'opened' promise, the second argument
- *  is the opening data. The `opening` promise emits `setup` and `ready` notifications when those processes are complete.
+ * @param {jQuery.Promise} opened A promise resolved with a value when the window is opened successfully.
+ *  This promise also emits `setup` and `ready` notifications. When this promise is resolved, the first
+ *  argument of the value is an 'closed' promise, the second argument is the opening data.
  * @param {Object} data Window opening data
  */
 
@@ -963,10 +1061,9 @@ OO.mixinClass( OO.ui.WindowManager, OO.EventEmitter );
  *
  * @event closing
  * @param {OO.ui.Window} win Window that's being closed
- * @param {jQuery.Promise} closing A `closing` promise is resolved with a value when the window
- *  is closed successfully. The promise emits `hold` and `teardown` notifications when those
- *  processes are complete. When the `closing` promise is resolved, the first argument of its value
- *  is the closing data.
+ * @param {jQuery.Promise} closed A promise resolved with a value when the window is closed successfully.
+ *  This promise also emits `hold` and `teardown` notifications. When this promise is resolved, the first
+ *  argument of its value is the closing data.
  * @param {Object} data Window closing data
  */
 
@@ -1037,8 +1134,16 @@ OO.ui.WindowManager.prototype.onWindowResize = function () {
  * @param {jQuery.Event} e Window resize event
  */
 OO.ui.WindowManager.prototype.afterWindowResize = function () {
+	var currentFocusedElement = document.activeElement;
 	if ( this.currentWindow ) {
 		this.updateWindowSize( this.currentWindow );
+
+		// Restore focus to the original element if it has changed.
+		// When a layout change is made on resize inputs lose focus
+		// on Android (Chrome and Firefox). See T162127.
+		if ( currentFocusedElement !== document.activeElement ) {
+			currentFocusedElement.focus();
+		}
 	}
 };
 
@@ -1049,7 +1154,8 @@ OO.ui.WindowManager.prototype.afterWindowResize = function () {
  * @return {boolean} Window is opening
  */
 OO.ui.WindowManager.prototype.isOpening = function ( win ) {
-	return win === this.currentWindow && !!this.opening && this.opening.state() === 'pending';
+	return win === this.currentWindow && !!this.lifecycle &&
+		this.lifecycle.isOpening();
 };
 
 /**
@@ -1059,7 +1165,8 @@ OO.ui.WindowManager.prototype.isOpening = function ( win ) {
  * @return {boolean} Window is closing
  */
 OO.ui.WindowManager.prototype.isClosing = function ( win ) {
-	return win === this.currentWindow && !!this.closing && this.closing.state() === 'pending';
+	return win === this.currentWindow && !!this.lifecycle &&
+		this.lifecycle.isClosing();
 };
 
 /**
@@ -1069,7 +1176,8 @@ OO.ui.WindowManager.prototype.isClosing = function ( win ) {
  * @return {boolean} Window is opened
  */
 OO.ui.WindowManager.prototype.isOpened = function ( win ) {
-	return win === this.currentWindow && !!this.opened && this.opened.state() === 'pending';
+	return win === this.currentWindow && !!this.lifecycle &&
+		this.lifecycle.isOpened();
 };
 
 /**
@@ -1139,9 +1247,9 @@ OO.ui.WindowManager.prototype.getTeardownDelay = function () {
  * Get a window by its symbolic name.
  *
  * If the window is not yet instantiated and its symbolic name is recognized by a factory, it will be
- * instantiated and added to the window manager automatically. Please see the [OOjs UI documentation on MediaWiki][3]
+ * instantiated and added to the window manager automatically. Please see the [OOUI documentation on MediaWiki][3]
  * for more information about using factories.
- * [3]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Window_managers
+ * [3]: https://www.mediawiki.org/wiki/OOUI/Windows/Window_managers
  *
  * @param {string} name Symbolic name of the window
  * @return {jQuery.Promise} Promise resolved with matching window, or rejected with an OO.ui.Error
@@ -1191,76 +1299,103 @@ OO.ui.WindowManager.prototype.getCurrentWindow = function () {
  * @param {Object} [data] Window opening data
  * @param {jQuery|null} [data.$returnFocusTo] Element to which the window will return focus when closed.
  *  Defaults the current activeElement. If set to null, focus isn't changed on close.
- * @return {jQuery.Promise} An `opening` promise resolved when the window is done opening.
- *  See {@link #event-opening 'opening' event}  for more information about `opening` promises.
+ * @return {OO.ui.WindowInstance|jQuery.Promise} A lifecycle object representing this particular
+ *  opening of the window. For backwards-compatibility, then object is also a Thenable that is resolved
+ *  when the window is done opening, with nested promise for when closing starts. This behaviour
+ *  is deprecated and is not compatible with jQuery 3. See T163510.
  * @fires opening
  */
-OO.ui.WindowManager.prototype.openWindow = function ( win, data ) {
-	var manager = this,
-		opening = $.Deferred();
+OO.ui.WindowManager.prototype.openWindow = function ( win, data, lifecycle, compatOpening ) {
+	var error,
+		manager = this;
 	data = data || {};
+
+	// Internal parameter 'lifecycle' allows this method to always return
+	// a lifecycle even if the window still needs to be created
+	// asynchronously when 'win' is a string.
+	lifecycle = lifecycle || new OO.ui.WindowInstance();
+	compatOpening = compatOpening || $.Deferred();
+
+	// Turn lifecycle into a Thenable for backwards-compatibility with
+	// the deprecated nested-promise behaviour, see T163510.
+	[ 'state', 'always', 'catch', 'pipe', 'then', 'promise', 'progress', 'done', 'fail' ]
+		.forEach( function ( method ) {
+			lifecycle[ method ] = function () {
+				OO.ui.warnDeprecation(
+					'Using the return value of openWindow as a promise is deprecated. ' +
+					'Use .openWindow( ... ).opening.' + method + '( ... ) instead.'
+				);
+				return compatOpening[ method ].apply( this, arguments );
+			};
+		} );
 
 	// Argument handling
 	if ( typeof win === 'string' ) {
-		return this.getWindow( win ).then( function ( win ) {
-			return manager.openWindow( win, data );
-		} );
+		this.getWindow( win ).then(
+			function ( win ) {
+				manager.openWindow( win, data, lifecycle, compatOpening );
+			},
+			function ( err ) {
+				lifecycle.deferreds.opening.reject( err );
+			}
+		);
+		return lifecycle;
 	}
 
 	// Error handling
 	if ( !this.hasWindow( win ) ) {
-		opening.reject( new OO.ui.Error(
-			'Cannot open window: window is not attached to manager'
-		) );
-	} else if ( this.preparingToOpen || this.opening || this.opened ) {
-		opening.reject( new OO.ui.Error(
-			'Cannot open window: another window is opening or open'
-		) );
+		error = 'Cannot open window: window is not attached to manager';
+	} else if ( this.lifecycle && this.lifecycle.isOpened() ) {
+		error = 'Cannot open window: another window is open';
+	} else if ( this.preparingToOpen || ( this.lifecycle && this.lifecycle.isOpening() ) ) {
+		error = 'Cannot open window: another window is opening';
 	}
 
-	// Window opening
-	if ( opening.state() !== 'rejected' ) {
-		// If a window is currently closing, wait for it to complete
-		this.preparingToOpen = $.when( this.closing );
-		// Ensure handlers get called after preparingToOpen is set
-		this.preparingToOpen.done( function () {
-			if ( manager.modal ) {
-				manager.toggleGlobalEvents( true );
-				manager.toggleAriaIsolation( true );
-			}
-			manager.$returnFocusTo = data.$returnFocusTo !== undefined ? data.$returnFocusTo : $( document.activeElement );
-			manager.currentWindow = win;
-			manager.opening = opening;
-			manager.preparingToOpen = null;
-			manager.emit( 'opening', win, opening, data );
-			setTimeout( function () {
-				win.setup( data ).then( function () {
-					manager.updateWindowSize( win );
-					manager.opening.notify( { state: 'setup' } );
-					setTimeout( function () {
-						win.ready( data ).then( function () {
-							manager.opening.notify( { state: 'ready' } );
-							manager.opening = null;
-							manager.opened = $.Deferred();
-							opening.resolve( manager.opened.promise(), data );
-						}, function () {
-							manager.opening = null;
-							manager.opened = $.Deferred();
-							opening.reject();
-							manager.closeWindow( win );
-						} );
-					}, manager.getReadyDelay() );
-				}, function () {
-					manager.opening = null;
-					manager.opened = $.Deferred();
-					opening.reject();
-					manager.closeWindow( win );
-				} );
-			}, manager.getSetupDelay() );
-		} );
+	if ( error ) {
+		compatOpening.reject( new OO.ui.Error( error ) );
+		lifecycle.deferreds.opening.reject( new OO.ui.Error( error ) );
+		return lifecycle;
 	}
 
-	return opening.promise();
+	// If a window is currently closing, wait for it to complete
+	this.preparingToOpen = $.when( this.lifecycle && this.lifecycle.closed );
+	// Ensure handlers get called after preparingToOpen is set
+	this.preparingToOpen.done( function () {
+		if ( manager.modal ) {
+			manager.toggleGlobalEvents( true );
+			manager.toggleAriaIsolation( true );
+		}
+		manager.$returnFocusTo = data.$returnFocusTo !== undefined ? data.$returnFocusTo : $( document.activeElement );
+		manager.currentWindow = win;
+		manager.lifecycle = lifecycle;
+		manager.preparingToOpen = null;
+		manager.emit( 'opening', win, compatOpening, data );
+		lifecycle.deferreds.opening.resolve( data );
+		setTimeout( function () {
+			manager.compatOpened = $.Deferred();
+			win.setup( data ).then( function () {
+				manager.updateWindowSize( win );
+				compatOpening.notify( { state: 'setup' } );
+				setTimeout( function () {
+					win.ready( data ).then( function () {
+						compatOpening.notify( { state: 'ready' } );
+						lifecycle.deferreds.opened.resolve( data );
+						compatOpening.resolve( manager.compatOpened.promise(), data );
+					}, function () {
+						lifecycle.deferreds.opened.reject();
+						compatOpening.reject();
+						manager.closeWindow( win );
+					} );
+				}, manager.getReadyDelay() );
+			}, function () {
+				lifecycle.deferreds.opened.reject();
+				compatOpening.reject();
+				manager.closeWindow( win );
+			} );
+		}, manager.getSetupDelay() );
+	} );
+
+	return lifecycle;
 };
 
 /**
@@ -1268,15 +1403,17 @@ OO.ui.WindowManager.prototype.openWindow = function ( win, data ) {
  *
  * @param {OO.ui.Window|string} win Window object or symbolic name of window to close
  * @param {Object} [data] Window closing data
- * @return {jQuery.Promise} A `closing` promise resolved when the window is done closing.
- *  See {@link #event-closing 'closing' event} for more information about closing promises.
- * @throws {Error} An error is thrown if the window is not managed by the window manager.
+ * @return {OO.ui.WindowInstance|jQuery.Promise} A lifecycle object representing this particular
+ *  opening of the window. For backwards-compatibility, the object is also a Thenable that is resolved
+ *  when the window is done closing, see T163510.
  * @fires closing
  */
 OO.ui.WindowManager.prototype.closeWindow = function ( win, data ) {
-	var manager = this,
-		closing = $.Deferred(),
-		opened;
+	var error,
+		manager = this,
+		compatClosing = $.Deferred(),
+		lifecycle = this.lifecycle,
+		compatOpened;
 
 	// Argument handling
 	if ( typeof win === 'string' ) {
@@ -1286,64 +1423,86 @@ OO.ui.WindowManager.prototype.closeWindow = function ( win, data ) {
 	}
 
 	// Error handling
-	if ( !win ) {
-		closing.reject( new OO.ui.Error(
-			'Cannot close window: window is not attached to manager'
-		) );
-	} else if ( win !== this.currentWindow ) {
-		closing.reject( new OO.ui.Error(
-			'Cannot close window: window already closed with different data'
-		) );
-	} else if ( this.preparingToClose || this.closing ) {
-		closing.reject( new OO.ui.Error(
-			'Cannot close window: window already closing with different data'
-		) );
+	if ( !lifecycle ) {
+		error = 'Cannot close window: no window is currently open';
+	} else if ( !win ) {
+		error = 'Cannot close window: window is not attached to manager';
+	} else if ( win !== this.currentWindow || this.lifecycle.isClosed() ) {
+		error = 'Cannot close window: window already closed with different data';
+	} else if ( this.preparingToClose || this.lifecycle.isClosing() ) {
+		error = 'Cannot close window: window already closing with different data';
 	}
 
-	// Window closing
-	if ( closing.state() !== 'rejected' ) {
-		// If the window is currently opening, close it when it's done
-		this.preparingToClose = $.when( this.opening );
-		// Ensure handlers get called after preparingToClose is set
-		this.preparingToClose.always( function () {
-			manager.closing = closing;
-			manager.preparingToClose = null;
-			manager.emit( 'closing', win, closing, data );
-			opened = manager.opened;
-			manager.opened = null;
-			opened.resolve( closing.promise(), data );
-			setTimeout( function () {
-				win.hold( data ).then( function () {
-					closing.notify( { state: 'hold' } );
-					setTimeout( function () {
-						win.teardown( data ).then( function () {
-							closing.notify( { state: 'teardown' } );
-							if ( manager.modal ) {
-								manager.toggleGlobalEvents( false );
-								manager.toggleAriaIsolation( false );
-							}
-							if ( manager.$returnFocusTo && manager.$returnFocusTo.length ) {
-								manager.$returnFocusTo[ 0 ].focus();
-							}
-							manager.closing = null;
-							manager.currentWindow = null;
-							closing.resolve( data );
-						} );
-					}, manager.getTeardownDelay() );
-				} );
-			}, manager.getHoldDelay() );
+	if ( error ) {
+		// This function was called for the wrong window and we don't want to mess with the current
+		// window's state.
+		lifecycle = new OO.ui.WindowInstance();
+		// Pretend the window has been opened, so that we can pretend to fail to close it.
+		lifecycle.deferreds.opening.resolve( {} );
+		lifecycle.deferreds.opened.resolve( {} );
+	}
+
+	// Turn lifecycle into a Thenable for backwards-compatibility with
+	// the deprecated nested-promise behaviour, see T163510.
+	[ 'state', 'always', 'catch', 'pipe', 'then', 'promise', 'progress', 'done', 'fail' ]
+		.forEach( function ( method ) {
+			lifecycle[ method ] = function () {
+				OO.ui.warnDeprecation(
+					'Using the return value of closeWindow as a promise is deprecated. ' +
+					'Use .closeWindow( ... ).closed.' + method + '( ... ) instead.'
+				);
+				return compatClosing[ method ].apply( this, arguments );
+			};
 		} );
+
+	if ( error ) {
+		compatClosing.reject( new OO.ui.Error( error ) );
+		lifecycle.deferreds.closing.reject( new OO.ui.Error( error ) );
+		return lifecycle;
 	}
 
-	return closing.promise();
+	// If the window is currently opening, close it when it's done
+	this.preparingToClose = $.when( this.lifecycle.opened );
+	// Ensure handlers get called after preparingToClose is set
+	this.preparingToClose.always( function () {
+		manager.preparingToClose = null;
+		manager.emit( 'closing', win, compatClosing, data );
+		lifecycle.deferreds.closing.resolve( data );
+		compatOpened = manager.compatOpened;
+		manager.compatOpened = null;
+		compatOpened.resolve( compatClosing.promise(), data );
+		setTimeout( function () {
+			win.hold( data ).then( function () {
+				compatClosing.notify( { state: 'hold' } );
+				setTimeout( function () {
+					win.teardown( data ).then( function () {
+						compatClosing.notify( { state: 'teardown' } );
+						if ( manager.modal ) {
+							manager.toggleGlobalEvents( false );
+							manager.toggleAriaIsolation( false );
+						}
+						if ( manager.$returnFocusTo && manager.$returnFocusTo.length ) {
+							manager.$returnFocusTo[ 0 ].focus();
+						}
+						manager.currentWindow = null;
+						manager.lifecycle = null;
+						lifecycle.deferreds.closed.resolve( data );
+						compatClosing.resolve( data );
+					} );
+				}, manager.getTeardownDelay() );
+			} );
+		}, manager.getHoldDelay() );
+	} );
+
+	return lifecycle;
 };
 
 /**
  * Add windows to the window manager.
  *
  * Windows can be added by reference, symbolic name, or explicitly defined symbolic names.
- * See the [OOjs ui documentation on MediaWiki] [2] for examples.
- * [2]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Window_managers
+ * See the [OOUI documentation on MediaWiki] [2] for examples.
+ * [2]: https://www.mediawiki.org/wiki/OOUI/Windows/Window_managers
  *
  * This function can be called in two manners:
  *
@@ -1438,7 +1597,7 @@ OO.ui.WindowManager.prototype.removeWindows = function ( names ) {
 			throw new Error( 'Cannot remove window' );
 		}
 		cleanupWindow = cleanup.bind( null, name, win );
-		promises.push( this.closeWindow( name ).then( cleanupWindow, cleanupWindow ) );
+		promises.push( this.closeWindow( name ).closed.then( cleanupWindow, cleanupWindow ) );
 	}
 
 	return $.when.apply( $, promises );
@@ -1544,20 +1703,33 @@ OO.ui.WindowManager.prototype.toggleGlobalEvents = function ( on ) {
  * @chainable
  */
 OO.ui.WindowManager.prototype.toggleAriaIsolation = function ( isolate ) {
+	var $topLevelElement;
 	isolate = isolate === undefined ? !this.$ariaHidden : !!isolate;
 
 	if ( isolate ) {
 		if ( !this.$ariaHidden ) {
+			// Find the top level element containing the window manager or the
+			// window manager's element itself in case its a direct child of body
+			$topLevelElement = this.$element.parentsUntil( 'body' ).last();
+			$topLevelElement = $topLevelElement.length === 0 ? this.$element : $topLevelElement;
+
+			// In case previously set by another window manager
+			this.$element.removeAttr( 'aria-hidden' );
+
 			// Hide everything other than the window manager from screen readers
 			this.$ariaHidden = $( 'body' )
 				.children()
-				.not( this.$element.parentsUntil( 'body' ).last() )
-				.attr( 'aria-hidden', '' );
+				.not( 'script' )
+				.not( $topLevelElement )
+				.attr( 'aria-hidden', true );
 		}
 	} else if ( this.$ariaHidden ) {
 		// Restore screen reader visibility
 		this.$ariaHidden.removeAttr( 'aria-hidden' );
 		this.$ariaHidden = null;
+
+		// and hide the window manager
+		this.$element.attr( 'aria-hidden', true );
 	}
 
 	return this;
@@ -1608,9 +1780,9 @@ OO.ui.WindowManager.prototype.destroy = function () {
  * methods. Note that each {@link OO.ui.Process process} is executed in series, so asynchronous
  * processing can complete. Always assume window processes are executed asynchronously.
  *
- * For more information, please see the [OOjs UI documentation on MediaWiki] [1].
+ * For more information, please see the [OOUI documentation on MediaWiki] [1].
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows
  *
  * @abstract
  * @class
@@ -1636,6 +1808,26 @@ OO.ui.Window = function OoUiWindow( config ) {
 	this.manager = null;
 	this.size = config.size || this.constructor.static.size;
 	this.$frame = $( '<div>' );
+	/**
+	 * Overlay element to use for the `$overlay` configuration option of widgets that support it.
+	 * Things put inside of it are overlaid on top of the window and are not bound to its dimensions.
+	 * See <https://www.mediawiki.org/wiki/OOUI/Concepts#Overlays>.
+	 *
+	 *     MyDialog.prototype.initialize = function () {
+	 *       ...
+	 *       var popupButton = new OO.ui.PopupButtonWidget( {
+	 *         $overlay: this.$overlay,
+	 *         label: 'Popup button',
+	 *         popup: {
+	 *           $content: $( '<p>Popup contents.</p><p>Popup contents.</p><p>Popup contents.</p>' ),
+	 *           padded: true
+	 *         }
+	 *       } );
+	 *       ...
+	 *     };
+	 *
+	 * @property {jQuery}
+	 */
 	this.$overlay = $( '<div>' );
 	this.$content = $( '<div>' );
 
@@ -2247,7 +2439,7 @@ OO.ui.Window.prototype.teardown = function ( data ) {
  * Unless extended to include controls, the rendered dialog box is a simple window
  * that users can close by hitting the ‘Esc’ key. Dialog windows are used with OO.ui.WindowManager,
  * which opens, closes, and controls the presentation of the window. See the
- * [OOjs UI documentation on MediaWiki] [1] for more information.
+ * [OOUI documentation on MediaWiki] [1] for more information.
  *
  *     @example
  *     // A simple dialog window.
@@ -2275,7 +2467,7 @@ OO.ui.Window.prototype.teardown = function ( data ) {
  *     // Open the window!
  *     windowManager.openWindow( myDialog );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Dialogs
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Dialogs
  *
  * @abstract
  * @class
@@ -2321,9 +2513,9 @@ OO.mixinClass( OO.ui.Dialog, OO.ui.mixin.PendingElement );
  * Symbolic name of dialog.
  *
  * The dialog class must have a symbolic name in order to be registered with OO.Factory.
- * Please see the [OOjs UI documentation on MediaWiki] [3] for more information.
+ * Please see the [OOUI documentation on MediaWiki] [3] for more information.
  *
- * [3]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Window_managers
+ * [3]: https://www.mediawiki.org/wiki/OOUI/Windows/Window_managers
  *
  * @abstract
  * @static
@@ -2352,7 +2544,7 @@ OO.ui.Dialog.static.title = '';
  * Actions can also be specified with data passed to the constructor (see #getSetupProcess). In this case, the static
  * value will be overridden.
  *
- * [2]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs#Action_sets
+ * [2]: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs#Action_sets
  *
  * @static
  * @inheritable
@@ -2492,21 +2684,15 @@ OO.ui.Dialog.prototype.getTeardownProcess = function ( data ) {
  * @inheritdoc
  */
 OO.ui.Dialog.prototype.initialize = function () {
-	var titleId;
-
 	// Parent method
 	OO.ui.Dialog.parent.prototype.initialize.call( this );
 
-	titleId = OO.ui.generateElementId();
-
 	// Properties
-	this.title = new OO.ui.LabelWidget( {
-		id: titleId
-	} );
+	this.title = new OO.ui.LabelWidget();
 
 	// Initialization
 	this.$content.addClass( 'oo-ui-dialog-content' );
-	this.$element.attr( 'aria-labelledby', titleId );
+	this.$element.attr( 'aria-labelledby', this.title.getElementId() );
 	this.setPendingElement( this.$head );
 };
 
@@ -2582,7 +2768,7 @@ OO.ui.Dialog.prototype.executeAction = function ( action ) {
  * action (e.g., ‘ok’) and ‘reject,’ the safe action (e.g., ‘cancel’). Both will close the window,
  * passing along the selected action.
  *
- * For more information and examples, please see the [OOjs UI documentation on MediaWiki][1].
+ * For more information and examples, please see the [OOUI documentation on MediaWiki][1].
  *
  *     @example
  *     // Example: Creating and opening a message dialog window.
@@ -2598,7 +2784,7 @@ OO.ui.Dialog.prototype.executeAction = function ( action ) {
  *         message: 'This is the message'
  *     } );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Message_Dialogs
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Message_Dialogs
  *
  * @class
  * @extends OO.ui.Dialog
@@ -2772,7 +2958,7 @@ OO.ui.MessageDialog.prototype.getReadyProcess = function ( data ) {
 				return action.getFlags().indexOf( 'primary' ) > -1;
 			} );
 			if ( actions.length > 0 ) {
-				actions[ 0 ].$button.focus();
+				actions[ 0 ].focus();
 			}
 		}, this );
 };
@@ -2932,7 +3118,7 @@ OO.ui.MessageDialog.prototype.fitActions = function () {
  * a ‘primary’ action on the right (e.g., ‘Done’).
  *
  * Like other windows, the process dialog is managed by a {@link OO.ui.WindowManager window manager}.
- * Please see the [OOjs UI documentation on MediaWiki][1] for more information and examples.
+ * Please see the [OOUI documentation on MediaWiki][1] for more information and examples.
  *
  *     @example
  *     // Example: Creating and opening a process dialog window.
@@ -2971,7 +3157,7 @@ OO.ui.MessageDialog.prototype.fitActions = function () {
  *     windowManager.addWindows( [ dialog ] );
  *     windowManager.openWindow( dialog );
  *
- * [1]: https://www.mediawiki.org/wiki/OOjs_UI/Windows/Process_Dialogs
+ * [1]: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs
  *
  * @abstract
  * @class
@@ -3160,7 +3346,8 @@ OO.ui.ProcessDialog.prototype.fitLabel = function () {
 		} else if ( this.isOpening() ) {
 			if ( !this.fitOnOpen ) {
 				// Size is relative and the dialog isn't open yet, so wait.
-				this.manager.opening.done( this.fitLabel.bind( this ) );
+				// FIXME: This should ideally be handled by setup somehow.
+				this.manager.lifecycle.opened.done( this.fitLabel.bind( this ) );
 				this.fitOnOpen = true;
 			}
 			return;
@@ -3315,12 +3502,8 @@ OO.ui.alert = function ( text, options ) {
 	return OO.ui.getWindowManager().openWindow( 'message', $.extend( {
 		message: text,
 		actions: [ OO.ui.MessageDialog.static.actions[ 0 ] ]
-	}, options ) ).then( function ( opened ) {
-		return opened.then( function ( closing ) {
-			return closing.then( function () {
-				return $.Deferred().resolve();
-			} );
-		} );
+	}, options ) ).closed.then( function () {
+		return undefined;
 	} );
 };
 
@@ -3350,12 +3533,8 @@ OO.ui.alert = function ( text, options ) {
 OO.ui.confirm = function ( text, options ) {
 	return OO.ui.getWindowManager().openWindow( 'message', $.extend( {
 		message: text
-	}, options ) ).then( function ( opened ) {
-		return opened.then( function ( closing ) {
-			return closing.then( function ( data ) {
-				return $.Deferred().resolve( !!( data && data.action === 'accept' ) );
-			} );
-		} );
+	}, options ) ).closed.then( function ( data ) {
+		return !!( data && data.action === 'accept' );
 	} );
 };
 
@@ -3384,29 +3563,31 @@ OO.ui.confirm = function ( text, options ) {
  *  resolve to `null`.
  */
 OO.ui.prompt = function ( text, options ) {
-	var manager = OO.ui.getWindowManager(),
+	var instance,
+		manager = OO.ui.getWindowManager(),
 		textInput = new OO.ui.TextInputWidget( ( options && options.textInput ) || {} ),
 		textField = new OO.ui.FieldLayout( textInput, {
 			align: 'top',
 			label: text
 		} );
 
-	// TODO: This is a little hacky, and could be done by extending MessageDialog instead.
-
-	return manager.openWindow( 'message', $.extend( {
+	instance = manager.openWindow( 'message', $.extend( {
 		message: textField.$element
-	}, options ) ).then( function ( opened ) {
-		// After ready
+	}, options ) );
+
+	// TODO: This is a little hacky, and could be done by extending MessageDialog instead.
+	instance.opened.then( function () {
 		textInput.on( 'enter', function () {
 			manager.getCurrentWindow().close( { action: 'accept' } );
 		} );
 		textInput.focus();
-		return opened.then( function ( closing ) {
-			return closing.then( function ( data ) {
-				return $.Deferred().resolve( data && data.action === 'accept' ? textInput.getValue() : null );
-			} );
-		} );
+	} );
+
+	return instance.closed.then( function ( data ) {
+		return data && data.action === 'accept' ? textInput.getValue() : null;
 	} );
 };
 
 }( OO ) );
+
+//# sourceMappingURL=oojs-ui-windows.js.map

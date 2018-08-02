@@ -4,9 +4,9 @@ use MediaWiki\Linker\LinkTarget;
 use MediaWiki\MediaWikiServices;
 
 /**
+ * @group medium
  * @group API
  * @group Database
- * @group medium
  *
  * @covers ApiQueryWatchlist
  */
@@ -23,7 +23,6 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 		parent::setUp();
 		self::$users['ApiQueryWatchlistIntegrationTestUser'] = $this->getMutableTestUser();
 		self::$users['ApiQueryWatchlistIntegrationTestUser2'] = $this->getMutableTestUser();
-		$this->doLogin( 'ApiQueryWatchlistIntegrationTestUser' );
 	}
 
 	private function getLoggedInTestUser() {
@@ -163,6 +162,9 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 	}
 
 	private function doListWatchlistRequest( array $params = [], $user = null ) {
+		if ( $user === null ) {
+			$user = $this->getLoggedInTestUser();
+		}
 		return $this->doApiRequest(
 			array_merge(
 				[ 'action' => 'query', 'list' => 'watchlist' ],
@@ -176,7 +178,7 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 			array_merge(
 				[ 'action' => 'query', 'generator' => 'watchlist' ],
 				$params
-			)
+			), null, false, $this->getLoggedInTestUser()
 		);
 	}
 
@@ -210,7 +212,7 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 
 		// not checking values of all keys of the actual item, so removing unwanted keys from comparison
 		$actualItemsOnlyComparedValues = array_map(
-			function( array $item ) use ( $keysUsedInValueComparison ) {
+			function ( array $item ) use ( $keysUsedInValueComparison ) {
 				return array_intersect_key( $item, array_flip( $keysUsedInValueComparison ) );
 			},
 			$actualItems
@@ -629,6 +631,7 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 					'type' => 'new',
 					'patrolled' => true,
 					'unpatrolled' => false,
+					'autopatrolled' => false,
 				]
 			],
 			$this->getItemsFromApiResponse( $result )
@@ -973,6 +976,7 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 					'type' => 'new',
 					'patrolled' => true,
 					'unpatrolled' => false,
+					'autopatrolled' => false,
 				]
 			],
 			$this->getItemsFromApiResponse( $resultPatrolled )
@@ -1072,8 +1076,10 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 			'rc_minor' => 0,
 			'rc_cur_id' => $title->getArticleID(),
 			'rc_user' => 0,
-			'rc_user_text' => 'External User',
+			'rc_user_text' => 'ext>External User',
 			'rc_comment' => '',
+			'rc_comment_text' => '',
+			'rc_comment_data' => null,
 			'rc_this_oldid' => $title->getLatestRevID(),
 			'rc_last_oldid' => $title->getLatestRevID(),
 			'rc_bot' => 0,
@@ -1474,6 +1480,9 @@ class ApiQueryWatchlistIntegrationTest extends ApiTestCase {
 		$otherUser->saveSettings();
 
 		$this->watchPages( $otherUser, [ $target ] );
+
+		$reloadedUser = User::newFromName( $otherUser->getName() );
+		$this->assertEquals( '1234567890', $reloadedUser->getOption( 'watchlisttoken' ) );
 
 		$result = $this->doListWatchlistRequest( [
 			'wlowner' => $otherUser->getName(),

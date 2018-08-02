@@ -16,7 +16,6 @@
  * http://www.gnu.org/copyleft/gpl.html
  *
  * @file
- * @author Aaron Schulz
  */
 use Psr\Log\LoggerInterface;
 
@@ -153,7 +152,7 @@ class PoolCounterRedis extends PoolCounter {
 		}
 		$conn = $status->value;
 
-		// @codingStandardsIgnoreStart Generic.Files.LineLength
+		// phpcs:disable Generic.Files.LineLength
 		static $script =
 		/** @lang Lua */
 <<<LUA
@@ -192,7 +191,7 @@ class PoolCounterRedis extends PoolCounter {
 		end
 		return 1
 LUA;
-		// @codingStandardsIgnoreEnd
+		// phpcs:enable
 
 		try {
 			$conn->luaEval( $script,

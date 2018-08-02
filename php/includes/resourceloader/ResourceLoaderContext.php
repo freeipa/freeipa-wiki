@@ -29,7 +29,7 @@ use MediaWiki\MediaWikiServices;
  * Object passed around to modules which contains information about the state
  * of a specific loader request.
  */
-class ResourceLoaderContext {
+class ResourceLoaderContext implements MessageLocalizer {
 	protected $resourceLoader;
 	protected $request;
 	protected $logger;
@@ -63,12 +63,8 @@ class ResourceLoaderContext {
 		$this->request = $request;
 		$this->logger = $resourceLoader->getLogger();
 
-		// Future developers: Avoid use of getVal() in this class, which performs
-		// expensive UTF normalisation by default. Use getRawVal() instead.
-		// Values here are either one of a finite number of internal IDs,
-		// or previously-stored user input (e.g. titles, user names) that were passed
-		// to this endpoint by ResourceLoader itself from the canonical value.
-		// Values do not come directly from user input and need not match.
+		// Future developers: Use WebRequest::getRawVal() instead getVal().
+		// The getVal() method performs slow Language+UTF logic. (f303bb9360)
 
 		// List of modules
 		$modules = $request->getRawVal( 'modules' );
@@ -98,9 +94,12 @@ class ResourceLoaderContext {
 	}
 
 	/**
-	 * Expand a string of the form jquery.foo,bar|jquery.ui.baz,quux to
-	 * an array of module names like [ 'jquery.foo', 'jquery.bar',
-	 * 'jquery.ui.baz', 'jquery.ui.quux' ]
+	 * Expand a string of the form `jquery.foo,bar|jquery.ui.baz,quux` to
+	 * an array of module names like `[ 'jquery.foo', 'jquery.bar',
+	 * 'jquery.ui.baz', 'jquery.ui.quux' ]`.
+	 *
+	 * This process is reversed by ResourceLoader::makePackedModulesString().
+	 *
 	 * @param string $modules Packed module name list
 	 * @return array Array of module names
 	 */
@@ -182,7 +181,6 @@ class ResourceLoaderContext {
 			$lang = $this->getRequest()->getRawVal( 'lang', '' );
 			// Stricter version of RequestContext::sanitizeLangCode()
 			if ( !Language::isValidBuiltInCode( $lang ) ) {
-				wfDebug( "Invalid user language code\n" );
 				$lang = $this->getResourceLoader()->getConfig()->get( 'LanguageCode' );
 			}
 			$this->language = $lang;
@@ -222,10 +220,12 @@ class ResourceLoaderContext {
 	 * Get a Message object with context set.  See wfMessage for parameters.
 	 *
 	 * @since 1.27
-	 * @param mixed ...
+	 * @param string|string[]|MessageSpecifier $key Message key, or array of keys,
+	 *   or a MessageSpecifier.
+	 * @param mixed $args,...
 	 * @return Message
 	 */
-	public function msg() {
+	public function msg( $key ) {
 		return call_user_func_array( 'wfMessage', func_get_args() )
 			->inLanguage( $this->getLanguage() )
 			// Use a dummy title because there is no real title

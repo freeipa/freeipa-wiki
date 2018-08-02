@@ -2,9 +2,6 @@
 /**
  * Helper class for making a copy of the database, mostly for unit testing.
  *
- * Copyright © 2010 Chad Horohoe <chad@anyonecanedit.org>
- * https://www.mediawiki.org/
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -46,8 +43,6 @@ class CloneDatabase {
 	private $db;
 
 	/**
-	 * Constructor
-	 *
 	 * @param IMaintainableDatabase $db A database subclass
 	 * @param array $tablesToClone An array of tables to clone, unprefixed
 	 * @param string $newTablePrefix Prefix to assign to the tables
@@ -55,12 +50,12 @@ class CloneDatabase {
 	 * @param bool $dropCurrentTables
 	 */
 	public function __construct( IMaintainableDatabase $db, array $tablesToClone,
-		$newTablePrefix, $oldTablePrefix = '', $dropCurrentTables = true
+		$newTablePrefix, $oldTablePrefix = null, $dropCurrentTables = true
 	) {
 		$this->db = $db;
 		$this->tablesToClone = $tablesToClone;
 		$this->newTablePrefix = $newTablePrefix;
-		$this->oldTablePrefix = $oldTablePrefix ? $oldTablePrefix : $this->db->tablePrefix();
+		$this->oldTablePrefix = $oldTablePrefix !== null ? $oldTablePrefix : $this->db->tablePrefix();
 		$this->dropCurrentTables = $dropCurrentTables;
 	}
 
@@ -93,8 +88,10 @@ class CloneDatabase {
 			self::changePrefix( $this->newTablePrefix );
 			$newTableName = $this->db->tableName( $tbl, 'raw' );
 
+			// Postgres: Temp tables are automatically deleted upon end of session
+			//           Same Temp table name hides existing table for current session
 			if ( $this->dropCurrentTables
-				&& !in_array( $this->db->getType(), [ 'postgres', 'oracle' ] )
+				&& !in_array( $this->db->getType(), [ 'oracle' ] )
 			) {
 				if ( $oldTableName === $newTableName ) {
 					// Last ditch check to avoid data loss

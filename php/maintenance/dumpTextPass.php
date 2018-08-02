@@ -25,15 +25,22 @@
  */
 
 require_once __DIR__ . '/backup.inc';
+require_once __DIR__ . '/7zip.inc';
 require_once __DIR__ . '/../includes/export/WikiExporter.php';
 
+use MediaWiki\MediaWikiServices;
 use Wikimedia\Rdbms\IMaintainableDatabase;
 
 /**
  * @ingroup Maintenance
  */
 class TextPassDumper extends BackupDumper {
+	/** @var BaseDump */
 	public $prefetch = null;
+	/** @var string|bool */
+	private $thisPage;
+	/** @var string|bool */
+	private $thisRev;
 
 	// when we spend more than maxTimeAllowed seconds on this run, we continue
 	// processing until we write out the next complete page, then save output file(s),
@@ -137,8 +144,6 @@ TEXT
 	}
 
 	function processOptions() {
-		global $IP;
-
 		parent::processOptions();
 
 		if ( $this->hasOption( 'buffersize' ) ) {
@@ -146,7 +151,6 @@ TEXT
 		}
 
 		if ( $this->hasOption( 'prefetch' ) ) {
-			require_once "$IP/maintenance/backupPrefetch.inc";
 			$url = $this->processFileOpt( $this->getOption( 'prefetch' ) );
 			$this->prefetch = new BaseDump( $url );
 		}
@@ -215,7 +219,8 @@ TEXT
 		// individually retrying at different layers of code.
 
 		try {
-			$this->lb = wfGetLBFactory()->newMainLB();
+			$lbFactory = MediaWikiServices::getInstance()->getDBLoadBalancerFactory();
+			$this->lb = $lbFactory->newMainLB();
 		} catch ( Exception $e ) {
 			throw new MWException( __METHOD__
 				. " rotating DB failed to obtain new load balancer (" . $e->getMessage() . ")" );
@@ -570,7 +575,6 @@ TEXT
 		}
 
 		while ( $failures < $this->maxFailures ) {
-
 			// As soon as we found a good text for the $id, we will return immediately.
 			// Hence, if we make it past the try catch block, we know that we did not
 			// find a good text.
@@ -583,8 +587,7 @@ TEXT
 				if ( $text === false && isset( $this->prefetch ) && $prefetchNotTried ) {
 					$prefetchNotTried = false;
 					$tryIsPrefetch = true;
-					$text = $this->prefetch->prefetch( intval( $this->thisPage ),
-						intval( $this->thisRev ) );
+					$text = $this->prefetch->prefetch( (int)$this->thisPage, (int)$this->thisRev );
 
 					if ( $text === null ) {
 						$text = false;
@@ -721,13 +724,13 @@ TEXT
 	}
 
 	private function getTextSpawned( $id ) {
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		if ( !$this->spawnProc ) {
 			// First time?
 			$this->openSpawn();
 		}
 		$text = $this->getTextSpawnedOnce( $id );
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 
 		return $text;
 	}
@@ -773,7 +776,7 @@ TEXT
 	}
 
 	private function closeSpawn() {
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		if ( $this->spawnRead ) {
 			fclose( $this->spawnRead );
 		}
@@ -790,7 +793,7 @@ TEXT
 			pclose( $this->spawnProc );
 		}
 		$this->spawnProc = false;
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 	}
 
 	private function getTextSpawnedOnce( $id ) {
@@ -985,5 +988,5 @@ TEXT
 	}
 }
 
-$maintClass = 'TextPassDumper';
+$maintClass = TextPassDumper::class;
 require_once RUN_MAINTENANCE_IF_MAIN;

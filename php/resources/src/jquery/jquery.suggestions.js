@@ -19,7 +19,6 @@
  * @class jQuery.plugin.suggestions
  */
 
- // jscs:disable checkParamNames
 /**
  * @method suggestions
  * @chainable
@@ -94,7 +93,6 @@
  * @param {boolean} [options.highlightInput=false] Whether to highlight matched portions of the
  *  input or not.
  */
- // jscs:enable checkParamNames
 
 ( function ( $, mw ) {
 
@@ -295,7 +293,7 @@
 									expandFrom = 'left';
 
 								// Catch invalid values, default to 'auto'
-								} else if ( $.inArray( expandFrom, [ 'left', 'right', 'start', 'end', 'auto' ] ) === -1 ) {
+								} else if ( [ 'left', 'right', 'start', 'end', 'auto' ].indexOf( expandFrom ) === -1 ) {
 									expandFrom = 'auto';
 								}
 
@@ -755,11 +753,11 @@
 							27, // escape
 							13, // enter
 							46, // delete
-							8   // backspace
+							8 //   backspace
 						];
 						if ( context.data.keypressedCount === 0 &&
 							e.which === context.data.keypressed &&
-							$.inArray( e.which, allowed ) !== -1
+							allowed.indexOf( e.which ) !== -1
 						) {
 							$.suggestions.keypress( e, context, context.data.keypressed );
 						}

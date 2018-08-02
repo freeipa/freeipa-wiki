@@ -21,5 +21,29 @@ class CreateAccountPage extends Page {
 		this.create.click();
 	}
 
+	apiCreateAccount( username, password ) {
+
+		const MWBot = require( 'mwbot' ), // https://github.com/Fannon/mwbot
+			Promise = require( 'bluebird' );
+		let bot = new MWBot();
+
+		return Promise.coroutine( function* () {
+			yield bot.loginGetCreateaccountToken( {
+				apiUrl: `${browser.options.baseUrl}/api.php`,
+				username: browser.options.username,
+				password: browser.options.password
+			} );
+			yield bot.request( {
+				action: 'createaccount',
+				createreturnurl: browser.options.baseUrl,
+				createtoken: bot.createaccountToken,
+				username: username,
+				password: password,
+				retype: password
+			} );
+		} ).call( this );
+
+	}
+
 }
 module.exports = new CreateAccountPage();

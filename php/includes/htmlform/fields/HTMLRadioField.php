@@ -72,17 +72,13 @@ class HTMLRadioField extends HTMLFormField {
 		) );
 	}
 
-	protected function shouldInfuseOOUI() {
-		return true;
-	}
-
 	public function formatOptions( $options, $value ) {
 		global $wgUseMediaWikiUIEverywhere;
 
 		$html = '';
 
 		$attribs = $this->getAttributes( [ 'disabled', 'tabindex' ] );
-		$elementFunc = [ 'Html', $this->mOptionsLabelsNotFromMessage ? 'rawElement' : 'element' ];
+		$elementFunc = [ Html::class, $this->mOptionsLabelsNotFromMessage ? 'rawElement' : 'element' ];
 
 		# @todo Should this produce an unordered list perhaps?
 		foreach ( $options as $label => $info ) {
@@ -90,7 +86,7 @@ class HTMLRadioField extends HTMLFormField {
 				$html .= Html::rawElement( 'h1', [], $label ) . "\n";
 				$html .= $this->formatOptions( $info, $value );
 			} else {
-				$id = Sanitizer::escapeId( $this->mID . "-$info" );
+				$id = Sanitizer::escapeIdForAttribute( $this->mID . "-$info" );
 				$classes = [ 'mw-htmlform-flatlist-item' ];
 				if ( $wgUseMediaWikiUIEverywhere || $this->mParent instanceof VFormHTMLForm ) {
 					$classes[] = 'mw-ui-radio';

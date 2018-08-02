@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on Oct 3, 2014 as a split from ApiQueryRevisions
- *
  * Copyright © 2006 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -103,6 +99,17 @@ abstract class ApiQueryRevisionsBase extends ApiQueryGeneratorBase {
 		$this->fld_user = isset( $prop['user'] );
 		$this->fld_tags = isset( $prop['tags'] );
 		$this->fld_parsetree = isset( $prop['parsetree'] );
+
+		if ( $this->fld_parsetree ) {
+			$encParam = $this->encodeParamName( 'prop' );
+			$name = $this->getModuleName();
+			$parent = $this->getParent();
+			$parentParam = $parent->encodeParamName( $parent->getModuleManager()->getModuleGroup( $name ) );
+			$this->addDeprecation(
+				[ 'apiwarn-deprecation-parameter', "{$encParam}=parsetree" ],
+				"action=query&{$parentParam}={$name}&{$encParam}=parsetree"
+			);
+		}
 
 		if ( !empty( $params['contentformat'] ) ) {
 			$this->contentFormat = $params['contentformat'];
@@ -477,6 +484,7 @@ abstract class ApiQueryRevisionsBase extends ApiQueryGeneratorBase {
 			'expandtemplates' => [
 				ApiBase::PARAM_DFLT => false,
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-expandtemplates',
+				ApiBase::PARAM_DEPRECATED => true,
 			],
 			'generatexml' => [
 				ApiBase::PARAM_DFLT => false,
@@ -486,19 +494,23 @@ abstract class ApiQueryRevisionsBase extends ApiQueryGeneratorBase {
 			'parse' => [
 				ApiBase::PARAM_DFLT => false,
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-parse',
+				ApiBase::PARAM_DEPRECATED => true,
 			],
 			'section' => [
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-section',
 			],
 			'diffto' => [
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-diffto',
+				ApiBase::PARAM_DEPRECATED => true,
 			],
 			'difftotext' => [
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-difftotext',
+				ApiBase::PARAM_DEPRECATED => true,
 			],
 			'difftotextpst' => [
 				ApiBase::PARAM_DFLT => false,
 				ApiBase::PARAM_HELP_MSG => 'apihelp-query+revisions+base-param-difftotextpst',
+				ApiBase::PARAM_DEPRECATED => true,
 			],
 			'contentformat' => [
 				ApiBase::PARAM_TYPE => ContentHandler::getAllContentFormats(),

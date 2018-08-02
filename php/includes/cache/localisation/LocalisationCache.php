@@ -20,8 +20,6 @@
  * @file
  */
 
-use Cdb\Reader as CdbReader;
-use Cdb\Writer as CdbWriter;
 use CLDRPluralRuleParser\Evaluator;
 use CLDRPluralRuleParser\Error as CLDRPluralRuleError;
 use MediaWiki\MediaWikiServices;
@@ -111,7 +109,8 @@ class LocalisationCache {
 	static public $allKeys = [
 		'fallback', 'namespaceNames', 'bookstoreList',
 		'magicWords', 'messages', 'rtl', 'capitalizeAllNouns', 'digitTransformTable',
-		'separatorTransformTable', 'fallback8bitEncoding', 'linkPrefixExtension',
+		'separatorTransformTable', 'minimumGroupingDigits',
+		'fallback8bitEncoding', 'linkPrefixExtension',
 		'linkTrail', 'linkPrefixCharset', 'namespaceAliases',
 		'dateFormats', 'datePreferences', 'datePreferenceMigrationMap',
 		'defaultDateFormat', 'extraUserToggles', 'specialPageAliases',
@@ -183,7 +182,6 @@ class LocalisationCache {
 	private $mergeableKeys = null;
 
 	/**
-	 * Constructor.
 	 * For constructor parameters, see the documentation in DefaultSettings.php
 	 * for $wgLocalisationCacheConf.
 	 *
@@ -201,22 +199,22 @@ class LocalisationCache {
 			switch ( $conf['store'] ) {
 				case 'files':
 				case 'file':
-					$storeClass = 'LCStoreCDB';
+					$storeClass = LCStoreCDB::class;
 					break;
 				case 'db':
-					$storeClass = 'LCStoreDB';
+					$storeClass = LCStoreDB::class;
 					break;
 				case 'array':
-					$storeClass = 'LCStoreStaticArray';
+					$storeClass = LCStoreStaticArray::class;
 					break;
 				case 'detect':
 					if ( !empty( $conf['storeDirectory'] ) ) {
-						$storeClass = 'LCStoreCDB';
+						$storeClass = LCStoreCDB::class;
 					} elseif ( $wgCacheDirectory ) {
 						$storeConf['directory'] = $wgCacheDirectory;
-						$storeClass = 'LCStoreCDB';
+						$storeClass = LCStoreCDB::class;
 					} else {
-						$storeClass = 'LCStoreDB';
+						$storeClass = LCStoreDB::class;
 					}
 					break;
 				default:
@@ -519,15 +517,15 @@ class LocalisationCache {
 	 */
 	protected function readPHPFile( $_fileName, $_fileType ) {
 		// Disable APC caching
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		$_apcEnabled = ini_set( 'apc.cache_by_default', '0' );
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 
 		include $_fileName;
 
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		ini_set( 'apc.cache_by_default', $_apcEnabled );
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 
 		if ( $_fileType == 'core' || $_fileType == 'extension' ) {
 			$data = compact( self::$allKeys );
@@ -688,7 +686,7 @@ class LocalisationCache {
 	 * exists, the data array is returned, otherwise false is returned.
 	 *
 	 * @param string $code
-	 * @param array $deps
+	 * @param array &$deps
 	 * @return array
 	 */
 	protected function readSourceFilesAndRegisterDeps( $code, &$deps ) {
@@ -720,7 +718,7 @@ class LocalisationCache {
 	 * Merge two localisation values, a primary and a fallback, overwriting the
 	 * primary value in place.
 	 * @param string $key
-	 * @param mixed $value
+	 * @param mixed &$value
 	 * @param mixed $fallbackValue
 	 */
 	protected function mergeItem( $key, &$value, $fallbackValue ) {
@@ -750,7 +748,7 @@ class LocalisationCache {
 	}
 
 	/**
-	 * @param mixed $value
+	 * @param mixed &$value
 	 * @param mixed $fallbackValue
 	 */
 	protected function mergeMagicWords( &$value, $fallbackValue ) {
@@ -776,7 +774,7 @@ class LocalisationCache {
 	 * otherwise.
 	 * @param array $codeSequence
 	 * @param string $key
-	 * @param mixed $value
+	 * @param mixed &$value
 	 * @param mixed $fallbackValue
 	 * @return bool
 	 */

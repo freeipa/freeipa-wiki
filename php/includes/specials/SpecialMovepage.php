@@ -105,7 +105,7 @@ class MovePageForm extends UnlistedSpecialPage {
 		$permErrors = $this->oldTitle->getUserPermissionsErrors( 'move', $user );
 		if ( count( $permErrors ) ) {
 			// Auto-block user's IP if the account was "hard" blocked
-			DeferredUpdates::addCallableUpdate( function() use ( $user ) {
+			DeferredUpdates::addCallableUpdate( function () use ( $user ) {
 				$user->spreadAnyEditBlock();
 			} );
 			throw new PermissionsError( 'move', $permErrors );
@@ -235,18 +235,18 @@ class MovePageForm extends UnlistedSpecialPage {
 		}
 
 		if ( count( $err ) ) {
-			$out->addHTML( "<div class='errorbox'>\n" );
 			$action_desc = $this->msg( 'action-move' )->plain();
-			$out->addWikiMsg( 'permissionserrorstext-withaction', count( $err ), $action_desc );
+			$errMsgHtml = $this->msg( 'permissionserrorstext-withaction',
+				count( $err ), $action_desc )->parseAsBlock();
 
 			if ( count( $err ) == 1 ) {
 				$errMsg = $err[0];
 				$errMsgName = array_shift( $errMsg );
 
 				if ( $errMsgName == 'hookaborted' ) {
-					$out->addHTML( "<p>{$errMsg[0]}</p>\n" );
+					$errMsgHtml .= "<p>{$errMsg[0]}</p>\n";
 				} else {
-					$out->addWikiMsgArray( $errMsgName, $errMsg );
+					$errMsgHtml .= $this->msg( $errMsgName, $errMsg )->parseAsBlock();
 				}
 			} else {
 				$errStr = [];
@@ -260,9 +260,9 @@ class MovePageForm extends UnlistedSpecialPage {
 					}
 				}
 
-				$out->addHTML( '<ul><li>' . implode( "</li>\n<li>", $errStr ) . "</li></ul>\n" );
+				$errMsgHtml .= '<ul><li>' . implode( "</li>\n<li>", $errStr ) . "</li></ul>\n";
 			}
-			$out->addHTML( "</div>\n" );
+			$out->addHTML( Html::errorBox( $errMsgHtml ) );
 		}
 
 		if ( $this->oldTitle->isProtected( 'move' ) ) {
@@ -287,8 +287,8 @@ class MovePageForm extends UnlistedSpecialPage {
 			$out->addHTML( "</div>\n" );
 		}
 
-		// Byte limit (not string length limit) for wpReason and wpNewTitleMain
-		// is enforced in the mediawiki.special.movePage module
+		// Length limit for wpReason and wpNewTitleMain is enforced in the
+		// mediawiki.special.movePage module
 
 		$immovableNamespaces = [];
 		foreach ( array_keys( $this->getLanguage()->getNamespaces() ) as $nsId ) {
@@ -326,11 +326,16 @@ class MovePageForm extends UnlistedSpecialPage {
 			]
 		);
 
+		// HTML maxlength uses "UTF-16 code units", which means that characters outside BMP
+		// (e.g. emojis) count for two each. This limit is overridden in JS to instead count
+		// Unicode codepoints (or 255 UTF-8 bytes for old schema).
+		$conf = $this->getConfig();
+		$oldCommentSchema = $conf->get( 'CommentTableSchemaMigrationStage' ) === MIGRATION_OLD;
 		$fields[] = new OOUI\FieldLayout(
 			new OOUI\TextInputWidget( [
 				'name' => 'wpReason',
 				'id' => 'wpReason',
-				'maxLength' => 200,
+				'maxLength' => $oldCommentSchema ? 200 : CommentStore::COMMENT_CHARACTER_LIMIT,
 				'infusable' => true,
 				'value' => $this->reason,
 			] ),
@@ -776,6 +781,12 @@ class MovePageForm extends UnlistedSpecialPage {
 		# Deal with watches (we don't watch subpages)
 		WatchAction::doWatchOrUnwatch( $this->watch, $ot, $user );
 		WatchAction::doWatchOrUnwatch( $this->watch, $nt, $user );
+
+		/**
+		 * T163966
+		 * Increment user_editcount during page moves
+		 */
+		$user->incEditCount();
 	}
 
 	function showLogFragment( $title ) {

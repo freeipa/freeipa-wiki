@@ -56,8 +56,9 @@ class MIMEsearchPage extends QueryPage {
 			// Allow wildcard searching
 			$minorType['img_minor_mime'] = $this->minor;
 		}
+		$imgQuery = LocalFile::getQueryInfo();
 		$qi = [
-			'tables' => [ 'image' ],
+			'tables' => $imgQuery['tables'],
 			'fields' => [
 				'namespace' => NS_FILE,
 				'title' => 'img_name',
@@ -67,13 +68,14 @@ class MIMEsearchPage extends QueryPage {
 				'img_size',
 				'img_width',
 				'img_height',
-				'img_user_text',
+				'img_user_text' => $imgQuery['fields']['img_user_text'],
 				'img_timestamp'
 			],
 			'conds' => [
 				'img_major_mime' => $this->major,
 				// This is in order to trigger using
 				// the img_media_mime index in "range" mode.
+				// @todo how is order defined? use MimeAnalyzer::getMediaTypes?
 				'img_media_type' => [
 					MEDIATYPE_BITMAP,
 					MEDIATYPE_DRAWING,
@@ -85,8 +87,10 @@ class MIMEsearchPage extends QueryPage {
 					MEDIATYPE_TEXT,
 					MEDIATYPE_EXECUTABLE,
 					MEDIATYPE_ARCHIVE,
+					MEDIATYPE_3D,
 				],
 			] + $minorType,
+			'join_conds' => $imgQuery['joins'],
 		];
 
 		return $qi;

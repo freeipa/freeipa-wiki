@@ -23,8 +23,8 @@
  * Item class for a filearchive table row
  */
 class RevDelArchivedFileItem extends RevDelFileItem {
-	/** @var $list RevDelArchivedFileList */
-	/** @var $file ArchivedFile */
+	/** @var RevDelArchivedFileList $list */
+	/** @var ArchivedFile $file */
 	/** @var LocalFile */
 	protected $lockFile;
 
@@ -48,6 +48,10 @@ class RevDelArchivedFileItem extends RevDelFileItem {
 
 	public function getAuthorNameField() {
 		return 'fa_user_text';
+	}
+
+	public function getAuthorActorField() {
+		return 'fa_actor';
 	}
 
 	public function getId() {

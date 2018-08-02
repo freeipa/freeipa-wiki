@@ -1,9 +1,5 @@
 <?php
 /**
- *
- *
- * Created on Sep 25, 2006
- *
  * Copyright © 2006 Yuri Astrakhan "<Firstname><Lastname>@gmail.com"
  *
  * This program is free software; you can redistribute it and/or modify
@@ -38,7 +34,7 @@ class ApiQueryInfo extends ApiQueryBase {
 		$fld_readable = false, $fld_watched = false,
 		$fld_watchers = false, $fld_visitingwatchers = false,
 		$fld_notificationtimestamp = false,
-		$fld_preload = false, $fld_displaytitle = false;
+		$fld_preload = false, $fld_displaytitle = false, $fld_varianttitles = false;
 
 	private $params;
 
@@ -53,7 +49,7 @@ class ApiQueryInfo extends ApiQueryBase {
 		$pageLatest, $pageLength;
 
 	private $protections, $restrictionTypes, $watched, $watchers, $visitingwatchers,
-		$notificationtimestamps, $talkids, $subjectids, $displaytitles;
+		$notificationtimestamps, $talkids, $subjectids, $displaytitles, $variantTitles;
 	private $showZeroWatchers = false;
 
 	private $tokenFunctions;
@@ -107,15 +103,15 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		$this->tokenFunctions = [
-			'edit' => [ 'ApiQueryInfo', 'getEditToken' ],
-			'delete' => [ 'ApiQueryInfo', 'getDeleteToken' ],
-			'protect' => [ 'ApiQueryInfo', 'getProtectToken' ],
-			'move' => [ 'ApiQueryInfo', 'getMoveToken' ],
-			'block' => [ 'ApiQueryInfo', 'getBlockToken' ],
-			'unblock' => [ 'ApiQueryInfo', 'getUnblockToken' ],
-			'email' => [ 'ApiQueryInfo', 'getEmailToken' ],
-			'import' => [ 'ApiQueryInfo', 'getImportToken' ],
-			'watch' => [ 'ApiQueryInfo', 'getWatchToken' ],
+			'edit' => [ self::class, 'getEditToken' ],
+			'delete' => [ self::class, 'getDeleteToken' ],
+			'protect' => [ self::class, 'getProtectToken' ],
+			'move' => [ self::class, 'getMoveToken' ],
+			'block' => [ self::class, 'getBlockToken' ],
+			'unblock' => [ self::class, 'getUnblockToken' ],
+			'email' => [ self::class, 'getEmailToken' ],
+			'import' => [ self::class, 'getImportToken' ],
+			'watch' => [ self::class, 'getWatchToken' ],
 		];
 		Hooks::run( 'APIQueryInfoTokens', [ &$this->tokenFunctions ] );
 
@@ -128,7 +124,7 @@ class ApiQueryInfo extends ApiQueryBase {
 	 * @deprecated since 1.24
 	 */
 	public static function resetTokenCache() {
-		ApiQueryInfo::$cachedTokens = [];
+		self::$cachedTokens = [];
 	}
 
 	/**
@@ -144,11 +140,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['edit'] ) ) {
-			ApiQueryInfo::$cachedTokens['edit'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['edit'] ) ) {
+			self::$cachedTokens['edit'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['edit'];
+		return self::$cachedTokens['edit'];
 	}
 
 	/**
@@ -161,11 +157,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['delete'] ) ) {
-			ApiQueryInfo::$cachedTokens['delete'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['delete'] ) ) {
+			self::$cachedTokens['delete'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['delete'];
+		return self::$cachedTokens['delete'];
 	}
 
 	/**
@@ -178,11 +174,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['protect'] ) ) {
-			ApiQueryInfo::$cachedTokens['protect'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['protect'] ) ) {
+			self::$cachedTokens['protect'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['protect'];
+		return self::$cachedTokens['protect'];
 	}
 
 	/**
@@ -195,11 +191,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['move'] ) ) {
-			ApiQueryInfo::$cachedTokens['move'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['move'] ) ) {
+			self::$cachedTokens['move'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['move'];
+		return self::$cachedTokens['move'];
 	}
 
 	/**
@@ -212,11 +208,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['block'] ) ) {
-			ApiQueryInfo::$cachedTokens['block'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['block'] ) ) {
+			self::$cachedTokens['block'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['block'];
+		return self::$cachedTokens['block'];
 	}
 
 	/**
@@ -237,11 +233,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['email'] ) ) {
-			ApiQueryInfo::$cachedTokens['email'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['email'] ) ) {
+			self::$cachedTokens['email'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['email'];
+		return self::$cachedTokens['email'];
 	}
 
 	/**
@@ -254,11 +250,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['import'] ) ) {
-			ApiQueryInfo::$cachedTokens['import'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['import'] ) ) {
+			self::$cachedTokens['import'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['import'];
+		return self::$cachedTokens['import'];
 	}
 
 	/**
@@ -271,11 +267,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['watch'] ) ) {
-			ApiQueryInfo::$cachedTokens['watch'] = $wgUser->getEditToken( 'watch' );
+		if ( !isset( self::$cachedTokens['watch'] ) ) {
+			self::$cachedTokens['watch'] = $wgUser->getEditToken( 'watch' );
 		}
 
-		return ApiQueryInfo::$cachedTokens['watch'];
+		return self::$cachedTokens['watch'];
 	}
 
 	/**
@@ -288,11 +284,11 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 
 		// The token is always the same, let's exploit that
-		if ( !isset( ApiQueryInfo::$cachedTokens['options'] ) ) {
-			ApiQueryInfo::$cachedTokens['options'] = $wgUser->getEditToken();
+		if ( !isset( self::$cachedTokens['options'] ) ) {
+			self::$cachedTokens['options'] = $wgUser->getEditToken();
 		}
 
-		return ApiQueryInfo::$cachedTokens['options'];
+		return self::$cachedTokens['options'];
 	}
 
 	public function execute() {
@@ -310,6 +306,7 @@ class ApiQueryInfo extends ApiQueryBase {
 			$this->fld_readable = isset( $prop['readable'] );
 			$this->fld_preload = isset( $prop['preload'] );
 			$this->fld_displaytitle = isset( $prop['displaytitle'] );
+			$this->fld_varianttitles = isset( $prop['varianttitles'] );
 		}
 
 		$pageSet = $this->getPageSet();
@@ -318,7 +315,7 @@ class ApiQueryInfo extends ApiQueryBase {
 		$this->everything = $this->titles + $this->missing;
 		$result = $this->getResult();
 
-		uasort( $this->everything, [ 'Title', 'compare' ] );
+		uasort( $this->everything, [ Title::class, 'compare' ] );
 		if ( !is_null( $this->params['continue'] ) ) {
 			// Throw away any titles we're gonna skip so they don't
 			// clutter queries
@@ -372,7 +369,11 @@ class ApiQueryInfo extends ApiQueryBase {
 			$this->getDisplayTitle();
 		}
 
-		/** @var $title Title */
+		if ( $this->fld_varianttitles ) {
+			$this->getVariantTitles();
+		}
+
+		/** @var Title $title */
 		foreach ( $this->everything as $pageid => $title ) {
 			$pageInfo = $this->extractPageInfo( $pageid, $title );
 			$fit = $pageInfo !== null && $result->addValue( [
@@ -514,6 +515,12 @@ class ApiQueryInfo extends ApiQueryBase {
 			}
 		}
 
+		if ( $this->fld_varianttitles ) {
+			if ( isset( $this->variantTitles[$pageid] ) ) {
+				$pageInfo['varianttitles'] = $this->variantTitles[$pageid];
+			}
+		}
+
 		if ( $this->params['testactions'] ) {
 			$limit = $this->getMain()->canApiHighLimits() ? self::LIMIT_SML1 : self::LIMIT_SML2;
 			if ( $this->countTestedActions >= $limit ) {
@@ -548,7 +555,7 @@ class ApiQueryInfo extends ApiQueryBase {
 
 			$res = $this->select( __METHOD__ );
 			foreach ( $res as $row ) {
-				/** @var $title Title */
+				/** @var Title $title */
 				$title = $this->titles[$row->pr_page];
 				$a = [
 					'type' => $row->pr_type,
@@ -688,7 +695,7 @@ class ApiQueryInfo extends ApiQueryBase {
 	private function getTSIDs() {
 		$getTitles = $this->talkids = $this->subjectids = [];
 
-		/** @var $t Title */
+		/** @var Title $t */
 		foreach ( $this->everything as $t ) {
 			if ( MWNamespace::isTalk( $t->getNamespace() ) ) {
 				if ( $this->fld_subjectid ) {
@@ -744,6 +751,32 @@ class ApiQueryInfo extends ApiQueryBase {
 		}
 	}
 
+	private function getVariantTitles() {
+		if ( !count( $this->titles ) ) {
+			return;
+		}
+		$this->variantTitles = [];
+		foreach ( $this->titles as $pageId => $t ) {
+			$this->variantTitles[$pageId] = isset( $this->displaytitles[$pageId] )
+				? $this->getAllVariants( $this->displaytitles[$pageId] )
+				: $this->getAllVariants( $t->getText(), $t->getNamespace() );
+		}
+	}
+
+	private function getAllVariants( $text, $ns = NS_MAIN ) {
+		global $wgContLang;
+		$result = [];
+		foreach ( $wgContLang->getVariants() as $variant ) {
+			$convertTitle = $wgContLang->autoConvert( $text, $variant );
+			if ( $ns !== NS_MAIN ) {
+				$convertNs = $wgContLang->convertNamespace( $ns, $variant );
+				$convertTitle = $convertNs . ':' . $convertTitle;
+			}
+			$result[$variant] = $convertTitle;
+		}
+		return $result;
+	}
+
 	/**
 	 * Get information about watched status and put it in $this->watched
 	 * and $this->notificationtimestamps
@@ -766,7 +799,7 @@ class ApiQueryInfo extends ApiQueryBase {
 		if ( $this->fld_watched ) {
 			foreach ( $timestamps as $namespaceId => $dbKeys ) {
 				$this->watched[$namespaceId] = array_map(
-					function( $x ) {
+					function ( $x ) {
 						return $x !== false;
 					},
 					$dbKeys
@@ -847,7 +880,7 @@ class ApiQueryInfo extends ApiQueryBase {
 				$timestamps[$row->page_namespace][$row->page_title] = $revTimestamp - $age;
 			}
 			$titlesWithThresholds = array_map(
-				function( LinkTarget $target ) use ( $timestamps ) {
+				function ( LinkTarget $target ) use ( $timestamps ) {
 					return [
 						$target, $timestamps[$target->getNamespace()][$target->getDBkey()]
 					];
@@ -860,7 +893,7 @@ class ApiQueryInfo extends ApiQueryBase {
 			$titlesWithThresholds = array_merge(
 				$titlesWithThresholds,
 				array_map(
-					function( LinkTarget $target ) {
+					function ( LinkTarget $target ) {
 						return [ $target, null ];
 					},
 					$this->missing
@@ -883,6 +916,7 @@ class ApiQueryInfo extends ApiQueryBase {
 			'url',
 			'preload',
 			'displaytitle',
+			'varianttitles',
 		];
 		if ( array_diff( (array)$params['prop'], $publicProps ) ) {
 			return 'private';
@@ -916,6 +950,7 @@ class ApiQueryInfo extends ApiQueryBase {
 					'readable', # private
 					'preload',
 					'displaytitle',
+					'varianttitles',
 					// If you add more properties here, please consider whether they
 					// need to be added to getCacheMode()
 				],

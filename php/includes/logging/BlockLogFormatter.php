@@ -22,8 +22,6 @@
  * @since 1.25
  */
 
-use MediaWiki\MediaWikiServices;
-
 /**
  * This class formats block log entries.
  *
@@ -60,7 +58,7 @@ class BlockLogFormatter extends LogFormatter {
 			// is shown on the correct side of the tooltip text.
 			$durationTooltip = '&lrm;' . htmlspecialchars( $params[4] );
 			$params[4] = Message::rawParam(
-				"<span class='blockExpiry' title='$durationTooltip'>" .
+				"<span class=\"blockExpiry\" title=\"$durationTooltip\">" .
 				$this->context->getLanguage()->translateBlockExpiry(
 					$params[4],
 					$this->context->getUser(),
@@ -99,7 +97,7 @@ class BlockLogFormatter extends LogFormatter {
 
 	public function getActionLinks() {
 		$subtype = $this->entry->getSubtype();
-		$linkRenderer = MediaWikiServices::getInstance()->getLinkRenderer();
+		$linkRenderer = $this->getLinkRenderer();
 		if ( $this->entry->isDeleted( LogPage::DELETED_ACTION ) // Action is hidden
 			|| !( $subtype === 'block' || $subtype === 'reblock' )
 			|| !$this->context->getUser()->isAllowed( 'block' )

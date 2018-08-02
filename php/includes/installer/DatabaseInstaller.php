@@ -42,6 +42,16 @@ abstract class DatabaseInstaller {
 	public $parent;
 
 	/**
+	 * @var string Set by subclasses
+	 */
+	public static $minimumVersion;
+
+	/**
+	 * @var string Set by subclasses
+	 */
+	protected static $notMiniumumVerisonMessage;
+
+	/**
 	 * The database connection.
 	 *
 	 * @var Database
@@ -61,6 +71,23 @@ abstract class DatabaseInstaller {
 	 * @var array
 	 */
 	protected $globalNames = [];
+
+	/**
+	 * Whether the provided version meets the necessary requirements for this type
+	 *
+	 * @param string $serverVersion Output of Database::getServerVersion()
+	 * @return Status
+	 * @since 1.30
+	 */
+	public static function meetsMinimumRequirement( $serverVersion ) {
+		if ( version_compare( $serverVersion, static::$minimumVersion ) < 0 ) {
+			return Status::newFatal(
+				static::$notMiniumumVerisonMessage, static::$minimumVersion, $serverVersion
+			);
+		}
+
+		return Status::newGood();
+	}
 
 	/**
 	 * Return the internal name, e.g. 'mysql', or 'sqlite'.
@@ -336,7 +363,7 @@ abstract class DatabaseInstaller {
 		$services = \MediaWiki\MediaWikiServices::getInstance();
 
 		$connection = $status->value;
-		$services->redefineService( 'DBLoadBalancerFactory', function() use ( $connection ) {
+		$services->redefineService( 'DBLoadBalancerFactory', function () use ( $connection ) {
 			return LBFactorySingle::newFromConnection( $connection );
 		} );
 	}
@@ -697,16 +724,16 @@ abstract class DatabaseInstaller {
 		}
 		$this->db->selectDB( $this->getVar( 'wgDBname' ) );
 
-		if ( $this->db->selectRow( 'interwiki', '*', [], __METHOD__ ) ) {
+		if ( $this->db->selectRow( 'interwiki', '1', [], __METHOD__ ) ) {
 			$status->warning( 'config-install-interwiki-exists' );
 
 			return $status;
 		}
 		global $IP;
-		MediaWiki\suppressWarnings();
+		Wikimedia\suppressWarnings();
 		$rows = file( "$IP/maintenance/interwiki.list",
 			FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
-		MediaWiki\restoreWarnings();
+		Wikimedia\restoreWarnings();
 		$interwikis = [];
 		if ( !$rows ) {
 			return Status::newFatal( 'config-install-interwiki-list' );

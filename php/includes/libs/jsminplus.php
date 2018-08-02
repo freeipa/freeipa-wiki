@@ -1,5 +1,5 @@
 <?php
-// @codingStandardsIgnoreFile File external to MediaWiki. Ignore coding conventions checks.
+// phpcs:ignoreFile -- File external to MediaWiki. Ignore coding conventions checks.
 /**
  * JSMinPlus version 1.4
  *
@@ -973,8 +973,6 @@ class JSParser
 					}
 					while (!$ss[$i]->isLoop && ($tt != KEYWORD_BREAK || $ss[$i]->type != KEYWORD_SWITCH));
 				}
-
-				$n->target = $ss[$i];
 			break;
 
 			case KEYWORD_TRY:
