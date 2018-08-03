@@ -13,3 +13,6 @@
 /php/downloads
 /php/docs/1.2/archive
 /php/docs/2.0.0/archive
+
+## Developer files
+*.swp
