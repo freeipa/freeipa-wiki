@@ -6,6 +6,12 @@ echo "Mediawiki assemble hook"
 # upload custom httpd configuration
 cp ${HOME}/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
 
+# make sure that the permanent directories exist
+mkdir -p /opt/app-root/data/images
+mkdir -p /opt/app-root/data/downloads
+mkdir -p /opt/app-root/data/docs/1.2/archive
+mkdir -p /opt/app-root/data/docs/2.0.0/archive
+
 # create symlinks for permanent directories
 ln -s /opt/app-root/data/images/ /opt/app-root/src/php/images
 ln -s /opt/app-root/data/downloads/ /opt/app-root/src/php/downloads
