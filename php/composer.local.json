@@ -2,6 +2,13 @@
     "extra": {
         "merge-plugin": {
             "include": [
+                "extensions/SyntaxHighlight_GeSHi/composer.json",
+                "extensions/ParserFunctions/composer.json",
+                "extensions/ReplaceText/composer.json",
+                "extensions/EmbedVideo/composer.json",
+                "extensions/intersection/composer.json",
+                "extensions/Cite/composer.json",
+                "extensions/Nuke/composer.json",
                 "extensions/OpenIDConnect/composer.json"
             ]
         }
