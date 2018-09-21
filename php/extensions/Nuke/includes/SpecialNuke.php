@@ -10,6 +10,9 @@ class SpecialNuke extends SpecialPage {
 		return true;
 	}
 
+	/**
+	 * @param null|string $par
+	 */
 	public function execute( $par ) {
 		$this->setHeaders();
 		$this->checkPermissions();
@@ -46,7 +49,6 @@ class SpecialNuke extends SpecialPage {
 		if ( $req->wasPosted()
 			&& $currentUser->matchEditToken( $req->getVal( 'wpEditToken' ) )
 		) {
-
 			if ( $req->getVal( 'action' ) === 'delete' ) {
 				$pages = $req->getArray( 'pages' );
 
@@ -70,7 +72,7 @@ class SpecialNuke extends SpecialPage {
 	/**
 	 * Prompt for a username or IP address.
 	 *
-	 * @param $userName string
+	 * @param string $userName
 	 */
 	protected function promptForm( $userName = '' ) {
 		$out = $this->getOutput();
@@ -127,8 +129,8 @@ class SpecialNuke extends SpecialPage {
 	 *
 	 * @param string $username
 	 * @param string $reason
-	 * @param integer $limit
-	 * @param integer|null $namespace
+	 * @param int $limit
+	 * @param int|null $namespace
 	 */
 	protected function listForm( $username, $reason, $limit, $namespace = null ) {
 		$out = $this->getOutput();
@@ -146,6 +148,8 @@ class SpecialNuke extends SpecialPage {
 
 			return;
 		}
+
+		$out->addModules( 'ext.nuke.confirm' );
 
 		if ( $username === '' ) {
 			$out->addWikiMsg( 'nuke-list-multiple' );
@@ -245,13 +249,13 @@ class SpecialNuke extends SpecialPage {
 	 * Gets a list of new pages by the specified user or everyone when none is specified.
 	 *
 	 * @param string $username
-	 * @param integer $limit
-	 * @param integer|null $namespace
+	 * @param int $limit
+	 * @param int|null $namespace
 	 *
 	 * @return array
 	 */
 	protected function getNewPages( $username, $limit, $namespace = null ) {
-		$dbr = wfGetDB( DB_SLAVE );
+		$dbr = wfGetDB( DB_REPLICA );
 
 		$what = [
 			'rc_namespace',
@@ -261,10 +265,22 @@ class SpecialNuke extends SpecialPage {
 
 		$where = [ "(rc_new = 1) OR (rc_log_type = 'upload' AND rc_log_action = 'upload')" ];
 
-		if ( $username === '' ) {
-			$what[] = 'rc_user_text';
+		if ( class_exists( 'ActorMigration' ) ) {
+			if ( $username === '' ) {
+				$actorQuery = ActorMigration::newMigration()->getJoin( 'rc_user' );
+				$what['rc_user_text'] = $actorQuery['fields']['rc_user_text'];
+			} else {
+				$actorQuery = ActorMigration::newMigration()
+					->getWhere( $dbr, 'rc_user', User::newFromName( $username, false ) );
+				$where[] = $actorQuery['conds'];
+			}
 		} else {
-			$where['rc_user_text'] = $username;
+			$actorQuery = [ 'tables' => [], 'joins' => [] ];
+			if ( $username === '' ) {
+				$what[] = 'rc_user_text';
+			} else {
+				$where['rc_user_text'] = $username;
+			}
 		}
 
 		if ( $namespace !== null ) {
@@ -279,7 +295,8 @@ class SpecialNuke extends SpecialPage {
 		}
 		$group = implode( ', ', $what );
 
-		$result = $dbr->select( 'recentchanges',
+		$result = $dbr->select(
+			[ 'recentchanges' ] + $actorQuery['tables'],
 			$what,
 			$where,
 			__METHOD__,
@@ -287,7 +304,8 @@ class SpecialNuke extends SpecialPage {
 				'ORDER BY' => 'rc_timestamp DESC',
 				'GROUP BY' => $group,
 				'LIMIT' => $limit
-			]
+			],
+			$actorQuery['joins']
 		);
 
 		$pages = [];
