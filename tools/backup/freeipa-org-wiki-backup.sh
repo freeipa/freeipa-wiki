@@ -27,7 +27,7 @@ fi
 
 oc project $OPENSHIFT_PROJECT > /dev/null
 
-db_pod=`oc get pods -o name | grep mysql | cut -d"/" -f 2`
+db_pod=`oc get pods -o name | grep freeipa-org-wiki-db | cut -d"/" -f 2`
 
 oc port-forward $db_pod 3306 > /dev/null &
 port_forward_ret=$?

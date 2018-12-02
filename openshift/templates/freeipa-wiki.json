@@ -362,7 +362,7 @@
       "spec": {
         "ports": [
           {
-            "name": "mysql",
+            "name": "freeipa-org-wiki-db",
             "port": 3306,
             "targetPort": 3306
           }
@@ -391,7 +391,7 @@
             "imageChangeParams": {
               "automatic": true,
               "containerNames": [
-                "mysql"
+                "freeipa-org-wiki-db"
               ],
               "from": {
                 "kind": "ImageStreamTag",
@@ -426,7 +426,7 @@
             ],
             "containers": [
               {
-                "name": "mysql",
+                "name": "freeipa-org-wiki-db",
                 "image": " ",
                 "ports": [
                   {
@@ -566,7 +566,7 @@
       "name": "DATABASE_SERVICE_NAME",
       "displayName": "Database Service Name",
       "required": true,
-      "value": "mysql"
+      "value": "freeipa-org-wiki-db"
     },
     {
       "name": "DATABASE_ENGINE",
