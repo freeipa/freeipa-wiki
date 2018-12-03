@@ -49,7 +49,7 @@ if [ $mysqldump_ret -ne 0 ]; then
     exit 1
 fi
 
-web_pod=`oc get pods -o name | grep freeipa-org-wiki | grep -v build |  cut -d"/" -f 2`
+web_pod=`oc get pods -o name | grep freeipa-org-wiki  | grep -v freeipa-org-wiki-db | grep -v build |  cut -d"/" -f 2`
 
 oc rsync -q $web_pod:/opt/app-root/data/images $WORK_DIR/
 
