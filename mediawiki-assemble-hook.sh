@@ -62,7 +62,6 @@ if [ $local_run -eq 1 ]; then
     php composer-setup.php
     php -r "unlink('composer-setup.php');"
 fi
-./composer.phar require -d $app_src/php/ --no-update pear/mail pear/net_smtp
 ./composer.phar install -d $app_src/php/ --no-dev --no-ansi --optimize-autoloader
 
 # Hack: enable redirect_uri knob with openid-connect-php
