@@ -4,9 +4,7 @@ Sources for www.freeipa.org
 ## Local Testing
 ### Via web server
 ```
-$ cd php
-$ wget https://getcomposer.org/composer.phar
-$ php composer.phar install
+$ ./mediawiki-assemble-hook.sh --local
 ```
 ### Via docker
 $ git clean -fxd
