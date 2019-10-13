@@ -30,7 +30,9 @@
         "mediawiki-secret-key" : "${MEDIAWIKI_SECRET_KEY}",
         "mediawiki-upgrade-key" : "${MEDIAWIKI_UPGRADE_KEY}",
         "oidc-client-id" : "${OIDC_CLIENT_ID}",
-        "oidc-client-secret" : "${OIDC_CLIENT_SECRET}"
+        "oidc-client-secret" : "${OIDC_CLIENT_SECRET}",
+        "smtp-user" : "${SMTP_USER}",
+        "smtp-password" : "${SMTP_PASSWORD}"
       }
     },
     {
@@ -297,6 +299,24 @@
                       "secretKeyRef" : {
                         "name" : "${NAME}",
                         "key" : "oidc-client-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SMTP_USER",
+                    "valueFrom": {
+                      "secretKeyRef" : {
+                        "name" : "${NAME}",
+                        "key" : "smtp-user"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SMTP_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef" : {
+                        "name" : "${NAME}",
+                        "key" : "smtp-password"
                       }
                     }
                   },
@@ -616,6 +636,16 @@
       "name": "OIDC_CLIENT_SECRET",
       "displayName": "OIDC Client Secret",
       "description": "Set this to OpenID Connect Client Secret used for user authentication"
+    },
+    {
+      "name": "SMTP_USER",
+      "displayName": "SMTP User",
+      "description": "SMTP User for Mailgun service"
+    },
+    {
+      "name": "SMTP_PASSWORD",
+      "displayName": "SMTP Password",
+      "description": "SMTP Password for Mailgun service"
     },
     {
       "name": "OPCACHE_REVALIDATE_FREQ",
