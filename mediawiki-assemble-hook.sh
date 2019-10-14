@@ -12,8 +12,8 @@ while :; do
             ;;
         -l|--local)
             echo "== local run =="
-            app_data=../data
-            app_src=.
+            app_data=`pwd`/../data
+            app_src=`pwd`
             local_run=1
             ;;
         --)
@@ -34,7 +34,7 @@ echo "Mediawiki assemble hook"
 
 if [ $local_run -eq 0 ]; then
     echo "Upload custom httpd configuration"
-    cp ${HOME}/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
+    cp $app_src/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
 fi
 
 echo "Make sure that the permanent directories exist"
@@ -52,13 +52,13 @@ ln -sf $app_data/docs/2.0.0/archive $app_src/php/docs/2.0.0/archive
 echo "Install wiki dependencies"
 if [ $local_run -eq 0 ]; then
     echo "Upload custom httpd configuration"
-    cp ${HOME}/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
+    cp $app_src/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
 fi
 
 if [ $local_run -eq 1 ]; then
     echo "Install composer.phar"
     php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    php -r "if (hash_file('sha384', 'composer-setup.php') === '48e3236262b34d30969dca3c37281b3b4bbe3221bda826ac6a9a62d6444cdb0dcd0615698a5cbe587c3f0fe57a54d8f5') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
+    php -r "if (hash_file('sha384', 'composer-setup.php') === 'a5c698ffe4b8e849a443b120cd5ba38043260d5c4023dbf93e1558871f1f07f58274fc6f4c93bcfd858c6bd0775cd8d1') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
     php composer-setup.php
     php -r "unlink('composer-setup.php');"
 fi
