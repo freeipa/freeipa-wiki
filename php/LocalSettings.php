@@ -335,3 +335,15 @@ else
 {
     die('Unsupported $user_authentication value: '. $user_authentication);
 }
+
+
+# Footer
+if ($on_openshift) {
+$wgFooterIcons['poweredby']['openshift'] = [
+	"src" => "https://www.openshift.com/images/logos/powered_by_openshift.png",
+	"url" => "https://www.openshift.com/",
+	"alt" => "Powered by OpenShift Online",
+	"height" => "48",
+	"width" => "181",
+];
+}
