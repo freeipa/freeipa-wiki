@@ -1,3 +1,12 @@
+== MediaWiki 1.31.5 ==
+
+This is a maintenance release of the MediaWiki 1.31 branch.
+
+=== Changes since MediaWiki 1.31.4 ===
+* Fix extra newlines in installer.
+* Followup T230402, PermissionManager doesn't exist until 1.33, so fix the
+  backported patches to use User::isAllowed() instead.
+
 == MediaWiki 1.31.4 ==
 
 This is a security and maintenance release of the MediaWiki 1.31 branch.
