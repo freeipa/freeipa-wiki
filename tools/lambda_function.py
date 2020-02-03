@@ -8,12 +8,16 @@ class BackupError(Exception):
 
 ec2_configuration = {
     'ec2_region': 'eu-central-1',
-    'controller_instance_name': 'freeipa-org-wiki-controller',
-    'controller_backup_script_path': '/root/bin/freeipa-org-wiki-backup.sh',
-    'controller_backup_script_timeout': 120,    # seconds
+    'controller_instance_name': 'freeipa-org-ocp-controller',
+    'timeout': 120,
 }
 
-def wiki_backup(debug):
+commands = [
+    {'path': '/root/bin/freeipa-planet-rebuild.sh'},
+    {'path': '/root/bin/freeipa-org-wiki-backup.sh'},
+]
+
+def run_scripts(debug):
     logger = logging.getLogger('www.freeipa.org')
     if debug:
         logger.setLevel(logging.DEBUG)
@@ -42,16 +46,16 @@ def wiki_backup(debug):
     controller_instance = instances[0]
     logger.debug("Found controller instance {}".format(controller_instance.id))
 
-    logger.debug("Executing backup script")
     ssm_client = boto3.client('ssm')
-    commands = [ec2_configuration['controller_backup_script_path']]
+    command_paths = [c['path'] for c in commands]
+    logger.debug("Executing commands: '{}'".format("', '".join(command_paths)))
 
     resp = ssm_client.send_command(
         DocumentName="AWS-RunShellScript",
-        Parameters={'commands': commands},
+        Parameters={'commands': command_paths},
         InstanceIds=[controller_instance.id],
-        TimeoutSeconds=ec2_configuration['controller_backup_script_timeout'],
-        Comment="Backup up FreeIPA Wiki"
+        TimeoutSeconds=ec2_configuration['timeout'],
+        Comment="Execute FreeIPA OCP commands"
         )
     command_id = resp['Command']['CommandId']
 
@@ -83,11 +87,11 @@ def wiki_backup(debug):
     logger.info("Backup finished with status {}".format(command_result['Status']))
 
 if __name__ == '__main__':
-    wiki_backup(debug=True)
+    run_scripts(debug=True)
 
 # Triggered by Amazon AWS
 def handler(event, context):
-    print("Run FreeIPA Wiki Backup Lambda", event, context)
-    wiki_backup(debug=False)
-    print("FreeIPA Wiki Backup Lambda finished")
-    return {'message': "FreeIPA Wiki Backup sucessful"}
+    print("Run FreeIPA OCP Lambda", event, context)
+    run_scripts(debug=False)
+    print("FreeIPA OCP Lambda finished")
+    return {'message': "FreeIPA OCP Lambda sucessful"}

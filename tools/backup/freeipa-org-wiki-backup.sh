@@ -1,10 +1,10 @@
 #!/bin/bash
 
-if [ ! -r ~/.freeipa_org_wiki_config ]; then
-    echo "Cannot read ~/.freeipa_org_wiki_config" >&2
+if [ ! -r ~/.freeipa_org_ocp_config ]; then
+    echo "Cannot read ~/.freeipa_org_ocp_config" >&2
     exit 1
 else
-    source ~/.freeipa_org_wiki_config
+    source ~/.freeipa_org_ocp_config
 fi
 
 WORK_DIR=`mktemp -d`
