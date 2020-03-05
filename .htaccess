@@ -6,7 +6,7 @@
    RewriteRule ^(.*)$ https://www.freeipa.org/$1 [R=301,L]
 
    # health endpoint for OCP
-   RewriteRule    ^health.php$ health.php    [L]
+   RewriteRule    ^health\.php$ health.php    [L]
 
    # site icon
    RewriteRule    ^([^/]+/)*favicon\.ico$ /images/freeipa/favicon.ico [L]
