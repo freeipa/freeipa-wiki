@@ -42,12 +42,14 @@ mkdir -p $app_data/images
 mkdir -p $app_data/downloads
 mkdir -p $app_data/docs/1.2/archive
 mkdir -p $app_data/docs/2.0.0/archive
+mkdir -p $app_data/security
 
 echo "Create symlinks for permanent directories"
 ln -sf $app_data/images/ $app_src/php/images
 ln -sf $app_data/downloads/ $app_src/php/downloads
 ln -sf $app_data/docs/1.2/archive $app_src/php/docs/1.2/archive
 ln -sf $app_data/docs/2.0.0/archive $app_src/php/docs/2.0.0/archive
+ln -sf $app_data/security/ $app_src/php/security
 
 echo "Install wiki dependencies"
 if [ $local_run -eq 0 ]; then

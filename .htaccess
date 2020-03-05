@@ -11,6 +11,10 @@
    # site icon
    RewriteRule    ^([^/]+/)*favicon\.ico$ /images/freeipa/favicon.ico [L]
 
+   # security instructions (https://securitytxt.org/)
+   RewriteRule    ^security\.txt$ /security/security.txt [L]
+   RewriteRule    ^\.well-known/security\.txt$ /security/security.txt [L]
+
    # rewrite other pages to app
    RewriteRule    ^$ php/    [L]
    RewriteRule    (.*) php/$1 [L]
