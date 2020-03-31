@@ -1,19 +1,19 @@
-From cc326520da51bba95026c1fb1051a695d959142a Mon Sep 17 00:00:00 2001
+From 19c353f238e4728cb860347daf7e32577a46ae75 Mon Sep 17 00:00:00 2001
 From: Martin Kosek <mkosek@redhat.com>
-Date: Wed, 15 Nov 2017 21:29:00 +0100
+Date: Tue, 31 Mar 2020 08:33:04 +0200
 Subject: [PATCH] Hack OIDC to return custom redirect_uri
 
 FreeIPA running in OCP is actually running under http and thus the redirect_uri
 does not match.
 ---
- php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php | 4 ++++
+ .../jumbojett/openid-connect-php/src/OpenIDConnectClient.php  | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php b/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
-index 6c88fe02d9690ed4e867101ea2d6f5cf3821529b..a97edd97be62fd5338008cc959f39b4f8bb9bf6d 100644
---- a/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
-+++ b/php/vendor/jumbojett/openid-connect-php/OpenIDConnectClient.php
-@@ -299,6 +299,10 @@ class OpenIDConnectClient
+diff --git a/php/vendor/jumbojett/openid-connect-php/src/OpenIDConnectClient.php b/php/vendor/jumbojett/openid-connect-php/src/OpenIDConnectClient.php
+index 560803b59d103068aa6d51d5507d341ed64677b4..5e65db12388b0bf1ba79932749644bc10cc0dbbf 100644
+--- a/php/vendor/jumbojett/openid-connect-php/src/OpenIDConnectClient.php
++++ b/php/vendor/jumbojett/openid-connect-php/src/OpenIDConnectClient.php
+@@ -497,6 +497,10 @@ class OpenIDConnectClient
              return $this->redirectURL;
          }
  
@@ -25,5 +25,5 @@ index 6c88fe02d9690ed4e867101ea2d6f5cf3821529b..a97edd97be62fd5338008cc959f39b4f
  
          /**
 -- 
-2.13.6
+2.25.1
 
