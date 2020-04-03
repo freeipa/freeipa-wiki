@@ -274,21 +274,27 @@ $wgSMTP = array (
 # User authentication configuration
 # Available choices:
 #   - oidc: OpenID Connect based authentication
+#   - oidc+simple: allow both simple user login + OpenID Connect login
 #   - openid: OpenID based authentication (old and deprecated)
 #   - simple: Simple user login
-$user_authentication = "oidc";
+$user_authentication = "oidc+simple";
 
-if ($user_authentication == "oidc") {
+if ($user_authentication == "oidc" || $user_authentication == "oidc+simple") {
     # PluggableAuth settings
     # https://www.mediawiki.org/wiki/Extension:PluggableAuth
     wfLoadExtension('PluggableAuth');
     $wgPluggableAuth_EnableAutoLogin = false;
-    $wgPluggableAuth_EnableLocalLogin = false;
+
+    if ($user_authentication == "oidc+simple") {
+        $wgPluggableAuth_EnableLocalLogin = true;
+    } else {
+        $wgPluggableAuth_EnableLocalLogin = false;
+    }
     $wgPluggableAuth_EnableLocalProperties = false;
     $wgPluggableAuth_Class = 'OpenIDConnect';
 
     # https://www.mediawiki.org/wiki/Extension:PluggableAuth#Installation
-    $wgGroupPermissions['*']['createaccount'] = true;
+    # autocreateaccount: Automatically log in with an external user account - a more limited version of createaccount
     $wgGroupPermissions['*']['autocreateaccount'] = true;
 
     # OpenID_Connect settings
