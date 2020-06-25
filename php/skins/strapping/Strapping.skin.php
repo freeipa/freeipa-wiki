@@ -230,9 +230,9 @@ class StrappingTemplate extends BaseTemplate {
     } ?>
 
     <?php if ($wgGroupPermissions['*']['edit'] || $this->data['loggedin']) {
-      $userStateClass += " editable";
+      $userStateClass .= " editable";
     } else {
-      $userStateClass += " not-editable";
+      $userStateClass .= " not-editable";
     } ?>
 
     <!-- content -->
