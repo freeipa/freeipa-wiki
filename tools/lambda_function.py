@@ -13,7 +13,6 @@ ec2_configuration = {
 }
 
 commands = [
-    {'path': '/root/bin/freeipa-planet-rebuild.sh'},
     {'path': '/root/bin/freeipa-org-wiki-backup.sh'},
 ]
 
