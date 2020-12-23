@@ -59,19 +59,19 @@ fi
 
 if [ $local_run -eq 1 ]; then
     echo "Install composer.phar"
-    EXPECTED_CHECKSUM="$(wget -q -O - https://composer.github.io/installer.sig)"
-    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', 'composer-setup.php');")"
+    EXPECTED_CHECKSUM="688bf8f868643b420dded326614fcdf969572ac8ad7fbbb92c28a631157d39e8"
+    php -r "copy('https://getcomposer.org/download/1.10.19/composer.phar', 'composer.phar');"
+    ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha256', 'composer.phar');")"
+    echo $ACTUAL_CHECKSUM
 
     if [ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]
     then
         >&2 echo 'ERROR: Invalid installer checksum'
-        rm composer-setup.php
+        rm composer.phar
         exit 1
     fi
 
-    php composer-setup.php
-    php -r "unlink('composer-setup.php');"
+    chmod +x composer.phar
 fi
 ./composer.phar install -d $app_src/php/ --no-dev --no-ansi --optimize-autoloader
 
