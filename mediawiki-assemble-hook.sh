@@ -4,6 +4,8 @@ set -e
 app_data=/opt/app-root/data
 app_src=/opt/app-root/src
 local_run=0
+override_server_composer=1
+
 while :; do
     case $1 in
         -h|-\?|--help)
@@ -57,7 +59,8 @@ if [ $local_run -eq 0 ]; then
     cp $app_src/mediawiki-httpd.conf /opt/app-root/etc/conf.d/
 fi
 
-if [ $local_run -eq 1 ]; then
+
+if [ $local_run -eq 1 ] || [ $override_server_composer -eq 1 ]; then
     echo "Install composer.phar"
     EXPECTED_CHECKSUM="688bf8f868643b420dded326614fcdf969572ac8ad7fbbb92c28a631157d39e8"
     php -r "copy('https://getcomposer.org/download/1.10.19/composer.phar', 'composer.phar');"
