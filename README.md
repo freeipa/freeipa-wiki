@@ -7,6 +7,7 @@ Sources for www.freeipa.org
 $ ./mediawiki-assemble-hook.sh --local
 ```
 ### Via docker
+```
 $ git clean -fxd
 $ sudo s2i build -c . rhscl/php-70-rhel7 freeipa-org-wiki
 ```
