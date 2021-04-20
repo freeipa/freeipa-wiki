@@ -70,7 +70,7 @@ $wgConfigRegistry = [
 /**
  * MediaWiki version number
  * @since 1.2
- * @deprecated since 1.35; use the MW_VERSION constant instead
+ * @deprecated since 1.35 (backported in 1.31.7); use the MW_VERSION constant instead
  */
 $wgVersion = MW_VERSION;
 
@@ -5650,8 +5650,7 @@ $wgApplyIpBlocksToXff = false;
  *         'edit' => [
  *             'anon' => [ x, y ], // any and all anonymous edits (aggregate)
  *             'user' => [ x, y ], // each logged-in user
- *             // per username, across all sites (assumes names are global)
- *             'global-user' => [ x, y ],
+ *             'user-global' => [ x, y ], // per username, across all sites (assumes names are global)
  *             'newbie' => [ x, y ], // each new autoconfirmed accounts; overrides 'user'
  *             'ip' => [ x, y ], // each anon and recent account, across all sites
  *             'subnet' => [ x, y ], // ... within a /24 subnet in IPv4 or /64 in IPv6
@@ -8786,6 +8785,10 @@ $wgEventRelayerConfig = [
  * MediaWiki developers to help guide future development efforts.
  *
  * For details about what data is sent, see: https://www.mediawiki.org/wiki/Manual:$wgPingback
+ *
+ * For the pingback privacy policy, see: https://wikimediafoundation.org/wiki/MediaWiki_Pingback_Privacy_Statement
+ *
+ * Aggregate pingback data is available at: https://pingback.wmflabs.org/
  *
  * @var bool
  * @since 1.28
