@@ -106,6 +106,10 @@
 		"test": [
 			"composer lint",
 			"composer phpcs"
+		],
+		"test-some": [
+			"composer lint",
+			"composer phpcs"
 		]
 	},
 	"config": {
