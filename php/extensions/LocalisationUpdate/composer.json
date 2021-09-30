@@ -27,7 +27,7 @@
 	],
 	"support": {
 		"issues": "https://phabricator.wikimedia.org/",
-		"irc": "irc://irc.freenode.net/mediawiki",
+		"irc": "irc://irc.libera.chat/mediawiki",
 		"forum": "https://www.mediawiki.org/wiki/Extension_talk:LocalisationUpdate",
 		"wiki": "https://www.mediawiki.org/wiki/Extension:LocalisationUpdate"
 	},
