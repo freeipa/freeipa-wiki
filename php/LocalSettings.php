@@ -353,3 +353,7 @@ $wgFooterIcons['poweredby']['openshift'] = [
 	"width" => "181",
 ];
 }
+
+# Disable actions
+$wgActions['mcrundo'] = false;
+$wgActions['mcrrestore'] = false;
